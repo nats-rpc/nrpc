@@ -1,5 +1,7 @@
 # nRPC
 
+[![Build Status](https://travis-ci.org/rapidloop/nrpc.svg?branch=master)](https://travis-ci.org/rapidloop/nrpc)
+
 nRPC is an RPC framework like [gRPC]((https://grpc.io/), but for
 [NATS](https://nats.io/).
 
