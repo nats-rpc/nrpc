@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/rapidloop/nrpc.svg?branch=master)](https://travis-ci.org/rapidloop/nrpc)
 
-nRPC is an RPC framework like [gRPC]((https://grpc.io/), but for
+nRPC is an RPC framework like [gRPC](https://grpc.io/), but for
 [NATS](https://nats.io/).
 
 It can generate a Go client and server from the same .proto file that you'd
@@ -65,7 +65,9 @@ Have a look at the generated and example files:
 ## Installation
 
 nRPC needs Go 1.7 or higher. $GOPATH/bin needs to be in $PATH for the protoc
-invocation to work.
+invocation to work. To generate code, you need the protobuf compiler (which
+you can install from [here](https://github.com/google/protobuf/releases))
+and the nRPC protoc plugin.
 
 To install the nRPC protoc plugin:
 
