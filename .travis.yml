@@ -5,6 +5,6 @@ go:
   - 1.8
 
 install:
-  - go get github.com/golang/protobuf
-  - go get github.com/nats-io/go-nats
+  - go get -d github.com/golang/protobuf
+  - go get -d github.com/nats-io/go-nats
 
