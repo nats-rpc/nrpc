@@ -1,0 +1,10 @@
+language: go
+
+go:
+  - 1.7
+  - 1.8
+
+install:
+  - github.com/golang/protobuf
+  - github.com/nats-io/go-nats
+
