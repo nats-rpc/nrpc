@@ -10,7 +10,7 @@ import (
 
 	nats "github.com/nats-io/go-nats"
 
-	// This is the package containing the generated *.pb.proto and *.nrpc.proto
+	// This is the package containing the generated *.pb.go and *.nrpc.go
 	// files.
 	"github.com/rapidloop/nrpc/examples/helloworld/helloworld"
 )
