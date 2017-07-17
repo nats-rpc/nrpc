@@ -4,3 +4,7 @@ go:
   - 1.7
   - 1.8
 
+install:
+  - go get github.com/nats-io/gnatsd
+  - $GOPATH/bin/gnatsd -l /dev/null &
+
