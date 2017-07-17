@@ -4,7 +4,3 @@ go:
   - 1.7
   - 1.8
 
-install:
-  - go get -d github.com/golang/protobuf
-  - go get -d github.com/nats-io/go-nats
-
