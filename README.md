@@ -62,6 +62,14 @@ Have a look at the generated and example files:
 - an example server [greeter_server/main.go](https://github.com/rapidloop/nrpc/tree/master/examples/helloworld/greeter_server/main.go)
 - an example client [greeter_client/main.go](https://github.com/rapidloop/nrpc/tree/master/examples/helloworld/greeter_client/main.go)
 
+## Features
+
+The following wiki pages describe nRPC features in more detail:
+
+- [Load Balancing](https://github.com/rapidloop/nrpc/wiki/Load-Balancing)
+- [Metrics Instrumentation](https://github.com/rapidloop/nrpc/wiki/Metrics-Instrumentation)
+  using Prometheus
+
 ## Installation
 
 nRPC needs Go 1.7 or higher. $GOPATH/bin needs to be in $PATH for the protoc
