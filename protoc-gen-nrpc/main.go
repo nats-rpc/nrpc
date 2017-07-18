@@ -91,6 +91,8 @@ func goFileName(d *descriptor.FileDescriptorProto) string {
 	return name
 }
 
+var pluginPrometheus bool
+
 var funcMap = template.FuncMap{
 	"GoPackageName": func(fd *descriptor.FileDescriptorProto) string {
 		p, _ := goPackageName(fd)
@@ -101,6 +103,9 @@ var funcMap = template.FuncMap{
 		s = strings.TrimPrefix(s, pkg)
 		s = strings.TrimPrefix(s, ".")
 		return s
+	},
+	"Prometheus": func() bool {
+		return pluginPrometheus
 	},
 }
 
@@ -121,6 +126,8 @@ func main() {
 	if len(request.FileToGenerate) == 0 {
 		log.Fatal("error: no files to generate")
 	}
+
+	pluginPrometheus = request.GetParameter() == "plugins=prometheus"
 
 	tmpl, err := template.New(".").Funcs(funcMap).Parse(tFile)
 	if err != nil {
