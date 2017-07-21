@@ -62,6 +62,73 @@ Have a look at the generated and example files:
 - an example server [greeter_server/main.go](https://github.com/rapidloop/nrpc/tree/master/examples/helloworld/greeter_server/main.go)
 - an example client [greeter_client/main.go](https://github.com/rapidloop/nrpc/tree/master/examples/helloworld/greeter_client/main.go)
 
+### How It Works
+
+The .proto file defines messages (like HelloRequest and HelloReply in the
+example) and services (Greeter) that have methods (SayHello).
+
+The messages are generated as Go structs by the regular Go protobuf compiler
+plugin and gets written out to \*.pb.go files.
+
+For the rest, nRPC generates three logical pieces.
+
+The first is a Go interface type (GreeterServer) which your actual
+microservice code should implement:
+
+```
+// This is what is contained in the .proto file
+service Greeter {
+    rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+// This is the generated interface which you've to implement
+type GreeterServer interface {
+    SayHello(ctx context.Context, req HelloRequest) (resp HelloReply, err error)
+}
+```
+
+The second is a client (GreeterClient struct). This struct has
+methods with appropriate types, that correspond to the service definition. The
+client code will marshal and wrap the request object (HelloRequest) and do a
+NATS `Request`.
+
+```
+// The client is associated with a NATS connection.
+func NewGreeterClient(nc *nats.Conn) *GreeterClient {...}
+
+// And has properly typed methods that will marshal and perform a NATS request.
+func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {...}
+```
+
+The third and final piece is the handler (GreeterHandler). Given a NATS
+connection and a server implementation, it can accept NATS requests in the
+format sent by the client above. It should be installed as a message handler for
+a particular NATS subject (defaults to the name of the service) using the
+NATS Subscribe() or QueueSubscribe() methods. It will invoke the appropriate
+method of the GreeterServer interface upon receiving the appropriate request.
+
+```
+// A handler is associated with a NATS connection and a server implementation.
+func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *GreeterHandler {...}
+
+// It has a method that can (should) be used as a NATS message handler.
+func (h *GreeterHandler) Handler(msg *nats.Msg) {...}
+```
+
+Standing up a microservice involves:
+
+- writing the .proto service definition file
+- generating the \*.pb.go and \*.nrpc.go files
+- implementing the server interface
+- writing a main app that will connect to NATS and start the handler ([see
+  example](https://github.com/rapidloop/nrpc/blob/master/examples/helloworld/greeter_server/main.go))
+
+To call the service:
+
+- import the package that contains the generated *.nrpc.go files
+- in the client code, connect to NATS
+- create a Caller object and call the methods as necessary ([see example](https://github.com/rapidloop/nrpc/blob/master/examples/helloworld/greeter_client/main.go))
+
 ## Features
 
 The following wiki pages describe nRPC features in more detail:
@@ -114,4 +181,3 @@ notice.
 Currently there is support only for Go clients and servers.
 
 Built by RapidLoop. Released under Apache 2.0 license.
-
