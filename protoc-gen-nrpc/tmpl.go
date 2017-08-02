@@ -136,7 +136,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 			if err != nil {
 				log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed: %v", err)
-				errstr = "handler error: " + err.Error()
+				errstr = err.Error()
 {{- if Prometheus}}
 				serverRequestsFor{{$serviceName}}.WithLabelValues("{{.GetName}}",
 					"handler_fail").Inc()
