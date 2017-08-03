@@ -145,7 +145,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 				resp = &innerResp
 			}
 		}
-	{{end -}}
+{{- end}}
 	default:
 		log.Printf("{{.GetName}}Handler: unknown name %q", name)
 		errstr = "unknown name: " + name
@@ -233,5 +233,4 @@ func init() {
 	prometheus.MustRegister(serverRequestsFor{{.GetName}})
 {{- end}}
 }
-{{- end}}
-`
+{{- end}}`
