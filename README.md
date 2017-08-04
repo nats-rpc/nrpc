@@ -153,7 +153,7 @@ $ go get github.com/rapidloop/nrpc/protoc-gen-nrpc
 To build and run the example greeter_server:
 
 ```
-$ go get github.com/rapidloop/nrpc/examples/greeter_server
+$ go get github.com/rapidloop/nrpc/examples/helloworld/greeter_server
 $ greeter_server
 server is running, ^C quits.
 ```
@@ -161,7 +161,7 @@ server is running, ^C quits.
 To build and run the example greeter_client:
 
 ```
-$ go get github.com/rapidloop/nrpc/examples/greeter_client
+$ go get github.com/rapidloop/nrpc/examples/helloworld/greeter_client
 $ greeter_client
 Greeting: Hello world
 $
