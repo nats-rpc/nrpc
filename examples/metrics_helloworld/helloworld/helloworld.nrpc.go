@@ -113,7 +113,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 			elapsed = time.Since(start).Seconds()
 			if err != nil {
 				log.Printf("SayHelloHandler: SayHello handler failed: %v", err)
-				errstr = "handler error: " + err.Error()
+				errstr = err.Error()
 				serverRequestsForGreeter.WithLabelValues("SayHello",
 					"handler_fail").Inc()
 			} else {
