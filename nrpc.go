@@ -3,28 +3,23 @@ package nrpc
 import (
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/go-nats"
 )
 
-func Call(name string, req proto.Message, nc *nats.Conn, subject string, timeout time.Duration) (resp []byte, err error) {
+func ExtractFunctionName(subject string) string {
+	splitted := strings.Split(subject, ".")
+	return splitted[len(splitted)-1]
+}
+
+func Call(req proto.Message, nc *nats.Conn, subject string, timeout time.Duration) (resp []byte, err error) {
 	// encode request
-	inner, err := proto.Marshal(req)
+	rawRequest, err := proto.Marshal(req)
 	if err != nil {
 		log.Printf("nrpc: inner request marshal failed: %v", err)
-		return
-	}
-
-	// encode rpc request
-	request := RPCRequest{
-		Name:    name,
-		Request: inner,
-	}
-	rawRequest, err := proto.Marshal(&request)
-	if err != nil {
-		log.Printf("nrpc: request marshal failed: %v", err)
 		return
 	}
 
@@ -50,19 +45,6 @@ func Call(name string, req proto.Message, nc *nats.Conn, subject string, timeout
 	}
 
 	resp = response.Response
-	return
-}
-
-func Decode(req []byte) (name string, inner []byte, err error) {
-	// decode the request
-	var request RPCRequest
-	if err = proto.Unmarshal(req, &request); err != nil {
-		log.Printf("nrpc: request unmarshal failed: %v", err)
-		return
-	}
-
-	name = request.Name
-	inner = request.Request
 	return
 }
 

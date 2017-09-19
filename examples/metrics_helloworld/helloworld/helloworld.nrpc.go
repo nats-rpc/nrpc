@@ -83,17 +83,12 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "Greeter"
+	return "Greeter.*"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
-	// decode the request
-	name, inner, err := nrpc.Decode(msg.Data)
-	if err != nil {
-		serverRequestsForGreeter.WithLabelValues("Greeter",
-			"protobuf_fail").Inc()
-		return
-	}
+	// extract method name from subject
+	name := nrpc.ExtractFunctionName(msg.Subject)
 
 	// call handler and form response
 	var resp proto.Message
@@ -101,15 +96,15 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	var elapsed float64
 	switch name {
 	case "SayHello":
-		var innerReq HelloRequest
-		if err := proto.Unmarshal(inner, &innerReq); err != nil {
+		var req HelloRequest
+		if err := proto.Unmarshal(msg.Data, &req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
 			errstr = "bad request received: " + err.Error()
 			serverRequestsForGreeter.WithLabelValues("SayHello",
 				"protobuf_fail").Inc()
 		} else {
 			start := time.Now()
-			innerResp, err := h.server.SayHello(h.ctx, innerReq)
+			innerResp, err := h.server.SayHello(h.ctx, req)
 			elapsed = time.Since(start).Seconds()
 			if err != nil {
 				log.Printf("SayHelloHandler: SayHello handler failed: %v", err)
@@ -128,7 +123,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	}
 
 	// encode and send response
-	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply) // error is logged
+	err := nrpc.Publish(resp, errstr, h.nc, msg.Reply) // error is logged
 	if err != nil {
 		serverRequestsForGreeter.WithLabelValues(name, "protobuf_fail").Inc()
 	} else if len(errstr) == 0 {
@@ -157,7 +152,7 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 	start := time.Now()
 
 	// call
-	respBytes, err := nrpc.Call("SayHello", &req, c.nc, c.Subject, c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject + ".SayHello", c.Timeout)
 	if err != nil {
 		clientCallsForGreeter.WithLabelValues("SayHello",
 			"call_fail").Inc()
