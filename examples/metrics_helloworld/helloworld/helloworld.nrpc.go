@@ -152,7 +152,7 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 	start := time.Now()
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject + ".SayHello", c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Timeout)
 	if err != nil {
 		clientCallsForGreeter.WithLabelValues("SayHello",
 			"call_fail").Inc()

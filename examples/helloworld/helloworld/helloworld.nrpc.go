@@ -88,7 +88,7 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject + ".SayHello", c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Timeout)
 	if err != nil {
 		return // already logged
 	}

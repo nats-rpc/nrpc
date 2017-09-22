@@ -187,7 +187,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 {{- end}}
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject + ".{{.GetName}}", c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".{{.GetName}}", c.Timeout)
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues("{{.GetName}}",
