@@ -38,8 +38,8 @@ func (h *GreeterHandler) Subject() string {
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
-	// extract method name from subject
-	name := nrpc.ExtractFunctionName(msg.Subject)
+	// extract method name & encoding from subject
+	name, encoding, err := nrpc.ExtractFunctionNameAndEncoding(msg.Subject)
 
 	// call handler and form response
 	var resp proto.Message
@@ -47,7 +47,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	switch name {
 	case "SayHello":
 		var req HelloRequest
-		if err := proto.Unmarshal(msg.Data, &req); err != nil {
+		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
 			errstr = "bad request received: " + err.Error()
 		} else {
@@ -65,7 +65,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	}
 
 	// encode and send response
-	err := nrpc.Publish(resp, errstr, h.nc, msg.Reply) // error is logged
+	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply, encoding) // error is logged
 	if err != nil {
 		log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
 	}
