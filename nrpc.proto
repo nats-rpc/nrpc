@@ -1,10 +1,5 @@
 syntax = "proto3";
 
-message RPCRequest {
-	string name = 1;
-	bytes request = 2;
-}
-
 message RPCResponse {
 	string error = 1;
 	bytes response = 2;

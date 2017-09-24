@@ -1,6 +1,7 @@
 package nrpc
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -15,7 +16,7 @@ func TestBasic(t *testing.T) {
 	}
 	defer nc.Close()
 
-	subn, err := nc.Subscribe("foo", func(m *nats.Msg) {
+	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
 		if err := Publish(&DummyMessage{"world"}, "", nc, m.Reply); err != nil {
 			t.Fatal(err)
 		}
@@ -25,7 +26,7 @@ func TestBasic(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	resp, err := Call("bar", &DummyMessage{"hello"}, nc, "foo", 5*time.Second)
+	resp, err := Call(&DummyMessage{"hello"}, nc, "foo.bar", 5*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,13 +46,12 @@ func TestDecode(t *testing.T) {
 	defer nc.Close()
 
 	var name string
-	subn, err := nc.Subscribe("foo", func(m *nats.Msg) {
+	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
+		rname := strings.Split(m.Subject, ".")[1]
 		var dm DummyMessage
-		if rname, inner, err := Decode(m.Data); err != nil {
-			t.Fatal(err)
-		} else if rname != name {
+		if rname != name {
 			t.Fatal("unexpected name: " + rname)
-		} else if err := proto.Unmarshal(inner, &dm); err != nil {
+		} else if err := proto.Unmarshal(m.Data, &dm); err != nil {
 			t.Fatal(err)
 		} else if dm.Foobar != "hello" {
 			t.Fatal("unexpected inner request: " + dm.Foobar)
@@ -67,7 +67,7 @@ func TestDecode(t *testing.T) {
 	var names = []string{"lorem", "ipsum", "dolor"}
 	for _, n := range names {
 		name = n
-		resp, err := Call(name, &DummyMessage{"hello"}, nc, "foo", 5*time.Second)
+		resp, err := Call(&DummyMessage{"hello"}, nc, "foo."+name, 5*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -87,7 +87,7 @@ func TestError(t *testing.T) {
 	}
 	defer nc.Close()
 
-	subn, err := nc.Subscribe("foo", func(m *nats.Msg) {
+	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
 		if err := Publish(&DummyMessage{"world"}, "anerror", nc, m.Reply); err != nil {
 			t.Fatal(err)
 		}
@@ -97,7 +97,7 @@ func TestError(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	_, err = Call("bar", &DummyMessage{"hello"}, nc, "foo", 5*time.Second)
+	_, err = Call(&DummyMessage{"hello"}, nc, "foo.bar", 5*time.Second)
 	if err == nil {
 		t.Fatal("error expected")
 	}
@@ -113,7 +113,7 @@ func TestTimeout(t *testing.T) {
 	}
 	defer nc.Close()
 
-	subn, err := nc.Subscribe("foo", func(m *nats.Msg) {
+	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
 		time.Sleep(time.Second)
 		if err := Publish(&DummyMessage{"world"}, "", nc, m.Reply); err != nil {
 			t.Fatal(err)
@@ -124,7 +124,7 @@ func TestTimeout(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	_, err = Call("bar", &DummyMessage{"hello"}, nc, "foo", 500*time.Millisecond)
+	_, err = Call(&DummyMessage{"hello"}, nc, "foo.bar", 500*time.Millisecond)
 	if err == nil {
 		t.Fatal("error expected")
 	} else if err.Error() != "nats: timeout" {
@@ -155,4 +155,3 @@ var dummyfileDescriptor0 = []byte{
 	0x92, 0x60, 0x54, 0x60, 0xd4, 0xe0, 0x0c, 0x82, 0xf2, 0x92, 0xd8, 0xc0, 0xca, 0x8d, 0x01, 0x01,
 	0x00, 0x00, 0xff, 0xff, 0x76, 0x6f, 0x42, 0xc1, 0x3c, 0x00, 0x00, 0x00,
 }
-

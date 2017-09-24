@@ -34,30 +34,30 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "Greeter"
+	return "Greeter.*"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
-	// decode the request
-	name, inner, err := nrpc.Decode(msg.Data)
-	if err != nil {
-		return
-	}
+	// extract method name from subject
+	name := nrpc.ExtractFunctionName(msg.Subject)
 
 	// call handler and form response
 	var resp proto.Message
 	var errstr string
 	switch name {
 	case "SayHello":
-		var innerReq HelloRequest
-		if err := proto.Unmarshal(inner, &innerReq); err != nil {
-			log.Printf("GreeterHandler: SayHello request unmarshal failed: %v", err)
+		var req HelloRequest
+		if err := proto.Unmarshal(msg.Data, &req); err != nil {
+			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
 			errstr = "bad request received: " + err.Error()
-		} else if innerResp, err := h.server.SayHello(h.ctx, innerReq); err != nil {
-			log.Printf("GreeterHandler: SayHello handler failed: %v", err)
-			errstr = "handler error: " + err.Error()
 		} else {
-			resp = &innerResp
+			innerResp, err := h.server.SayHello(h.ctx, req)
+			if err != nil {
+				log.Printf("SayHelloHandler: SayHello handler failed: %v", err)
+				errstr = err.Error()
+			} else {
+				resp = &innerResp
+			}
 		}
 	default:
 		log.Printf("GreeterHandler: unknown name %q", name)
@@ -65,7 +65,10 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	}
 
 	// encode and send response
-	nrpc.Publish(resp, errstr, h.nc, msg.Reply) // error is logged
+	err := nrpc.Publish(resp, errstr, h.nc, msg.Reply) // error is logged
+	if err != nil {
+		log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
+	}
 }
 
 type GreeterClient struct {
@@ -83,8 +86,9 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 }
 
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
+
 	// call
-	respBytes, err := nrpc.Call("SayHello", &req, c.nc, c.Subject, c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Timeout)
 	if err != nil {
 		return // already logged
 	}

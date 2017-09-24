@@ -95,19 +95,12 @@ func New{{.GetName}}Handler(ctx context.Context, nc *nats.Conn, s {{.GetName}}Se
 }
 
 func (h *{{.GetName}}Handler) Subject() string {
-	return "{{.GetName}}"
+	return "{{.GetName}}.*"
 }
 
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
-	// decode the request
-	name, inner, err := nrpc.Decode(msg.Data)
-	if err != nil {
-{{- if Prometheus}}
-		serverRequestsFor{{.GetName}}.WithLabelValues("{{.GetName}}",
-			"protobuf_fail").Inc()
-{{- end}}
-		return
-	}
+	// extract method name from subject
+	name := nrpc.ExtractFunctionName(msg.Subject)
 
 	// call handler and form response
 	var resp proto.Message
@@ -118,8 +111,8 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	switch name {
 	{{- $serviceName := .GetName}}{{- range .Method}}
 	case "{{.GetName}}":
-		var innerReq {{GetPkg $pkgName .GetInputType}}
-		if err := proto.Unmarshal(inner, &innerReq); err != nil {
+		var req {{GetPkg $pkgName .GetInputType}}
+		if err := proto.Unmarshal(msg.Data, &req); err != nil {
 			log.Printf("{{.GetName}}Handler: {{.GetName}} request unmarshal failed: %v", err)
 			errstr = "bad request received: " + err.Error()
 {{- if Prometheus}}
@@ -130,7 +123,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- if Prometheus}}
 			start := time.Now()
 {{- end}}
-			innerResp, err := h.server.{{.GetName}}(h.ctx, innerReq)
+			innerResp, err := h.server.{{.GetName}}(h.ctx, req)
 {{- if Prometheus}}
 			elapsed = time.Since(start).Seconds()
 {{- end}}
@@ -156,7 +149,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	}
 
 	// encode and send response
-	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply) // error is logged
+	err := nrpc.Publish(resp, errstr, h.nc, msg.Reply) // error is logged
 {{- if Prometheus}}
 	if err != nil {
 		serverRequestsFor{{$serviceName}}.WithLabelValues(name, "protobuf_fail").Inc()
@@ -166,6 +159,10 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 
 	// report metric to Prometheus
 	serverHETFor{{$serviceName}}.WithLabelValues(name).Observe(elapsed)
+{{- else}}
+	if err != nil {
+		log.Println("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
+	}
 {{- end}}
 }
 
@@ -190,7 +187,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 {{- end}}
 
 	// call
-	respBytes, err := nrpc.Call("{{.GetName}}", &req, c.nc, c.Subject, c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".{{.GetName}}", c.Timeout)
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues("{{.GetName}}",
