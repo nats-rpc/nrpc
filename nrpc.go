@@ -29,7 +29,7 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 	case "json":
 		return json.Marshal(msg)
 	default:
-		return nil, errors.New("Invalid encodling: " + encoding)
+		return nil, errors.New("Invalid encoding: " + encoding)
 	}
 }
 
@@ -38,21 +38,16 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 // The subject structure is: "[package.]service.function[-encoding]"
 func ExtractFunctionNameAndEncoding(subject string) (name string, encoding string, err error) {
 	dotSplitted := strings.Split(subject, ".")
-	dashSplitted := strings.Split(dotSplitted[len(dotSplitted)-1], "-")
-
-	if len(dashSplitted) > 2 {
-		err = errors.New(
-			"Invalid subject. Expects at most one '-', got " +
-				dotSplitted[len(dotSplitted)-1])
-		return
-	}
-
-	name = dashSplitted[0]
-
-	if len(dashSplitted) == 2 {
-		encoding = dashSplitted[1]
-	} else {
+	if len(dotSplitted) == 2 {
+		name = dotSplitted[1]
 		encoding = "proto"
+	} else if len(dotSplitted) == 3 {
+		name = dotSplitted[1]
+		encoding = dotSplitted[2]
+	} else {
+		err = errors.New(
+			"Invalid subject. Expects 2 or 3 parts, got " + subject,
+		)
 	}
 
 	return

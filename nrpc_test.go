@@ -185,9 +185,10 @@ func TestExtractFunctionNameAndEncoding(t *testing.T) {
 		err      string
 	}{
 		{"foo.bar", "bar", "proto", ""},
-		{"foo.bar-proto", "bar", "proto", ""},
-		{"foo.bar-json", "bar", "json", ""},
-		{"foo.bar-json-proto", "", "", "Invalid subject. Expects at most one '-', got bar-json-proto"},
+		{"foo.bar.proto", "bar", "proto", ""},
+		{"foo.bar.json", "bar", "json", ""},
+		{"foo.bar.json.proto", "", "",
+			"Invalid subject. Expects 2 or 3 parts, got foo.bar.json.proto"},
 	} {
 		name, encoding, err := ExtractFunctionNameAndEncoding(tt.subject)
 		if name != tt.name {

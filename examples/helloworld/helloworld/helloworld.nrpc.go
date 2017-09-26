@@ -34,7 +34,7 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "Greeter.*"
+	return "Greeter.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {

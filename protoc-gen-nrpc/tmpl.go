@@ -95,7 +95,7 @@ func New{{.GetName}}Handler(ctx context.Context, nc *nats.Conn, s {{.GetName}}Se
 }
 
 func (h *{{.GetName}}Handler) Subject() string {
-	return "{{.GetName}}.*"
+	return "{{.GetName}}.>"
 }
 
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
