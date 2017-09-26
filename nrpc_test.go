@@ -18,7 +18,7 @@ func TestBasic(t *testing.T) {
 	defer nc.Close()
 
 	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
-		if err := Publish(&DummyMessage{"world"}, "", nc, m.Reply, "proto"); err != nil {
+		if err := Publish(&DummyMessage{"world"}, "", nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -56,7 +56,7 @@ func TestDecode(t *testing.T) {
 			t.Fatal(err)
 		} else if dm.Foobar != "hello" {
 			t.Fatal("unexpected inner request: " + dm.Foobar)
-		} else if err := Publish(&DummyMessage{"world"}, "", nc, m.Reply, "proto"); err != nil {
+		} else if err := Publish(&DummyMessage{"world"}, "", nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -89,7 +89,7 @@ func TestError(t *testing.T) {
 	defer nc.Close()
 
 	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
-		if err := Publish(&DummyMessage{"world"}, "anerror", nc, m.Reply, "proto"); err != nil {
+		if err := Publish(&DummyMessage{"world"}, "anerror", nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -116,7 +116,7 @@ func TestTimeout(t *testing.T) {
 
 	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
 		time.Sleep(time.Second)
-		if err := Publish(&DummyMessage{"world"}, "", nc, m.Reply, "proto"); err != nil {
+		if err := Publish(&DummyMessage{"world"}, "", nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -139,7 +139,7 @@ var (
 		encoding string
 		data     []byte
 	}{
-		{"proto", []byte{10, 5, 104, 101, 108, 108, 111}},
+		{"protobuf", []byte{10, 5, 104, 101, 108, 108, 111}},
 		{"json", []byte(`{"foobar":"hello"}`)},
 	}
 )
@@ -184,11 +184,11 @@ func TestExtractFunctionNameAndEncoding(t *testing.T) {
 		encoding string
 		err      string
 	}{
-		{"foo.bar", "bar", "proto", ""},
-		{"foo.bar.proto", "bar", "proto", ""},
+		{"foo.bar", "bar", "protobuf", ""},
+		{"foo.bar.protobuf", "bar", "protobuf", ""},
 		{"foo.bar.json", "bar", "json", ""},
-		{"foo.bar.json.proto", "", "",
-			"Invalid subject. Expects 2 or 3 parts, got foo.bar.json.proto"},
+		{"foo.bar.json.protobuf", "", "",
+			"Invalid subject. Expects 2 or 3 parts, got foo.bar.json.protobuf"},
 	} {
 		name, encoding, err := ExtractFunctionNameAndEncoding(tt.subject)
 		if name != tt.name {

@@ -13,7 +13,7 @@ import (
 
 func Unmarshal(encoding string, data []byte, msg proto.Message) error {
 	switch encoding {
-	case "proto":
+	case "protobuf":
 		return proto.Unmarshal(data, msg)
 	case "json":
 		return json.Unmarshal(data, msg)
@@ -24,7 +24,7 @@ func Unmarshal(encoding string, data []byte, msg proto.Message) error {
 
 func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 	switch encoding {
-	case "proto":
+	case "protobuf":
 		return proto.Marshal(msg)
 	case "json":
 		return json.Marshal(msg)
@@ -34,13 +34,13 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 }
 
 // ExtractFunctionNameAndEncoding parses a subject and extract the function
-// name and the encoding (defaults to "proto").
+// name and the encoding (defaults to "protobuf").
 // The subject structure is: "[package.]service.function[-encoding]"
 func ExtractFunctionNameAndEncoding(subject string) (name string, encoding string, err error) {
 	dotSplitted := strings.Split(subject, ".")
 	if len(dotSplitted) == 2 {
 		name = dotSplitted[1]
-		encoding = "proto"
+		encoding = "protobuf"
 	} else if len(dotSplitted) == 3 {
 		name = dotSplitted[1]
 		encoding = dotSplitted[2]
