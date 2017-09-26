@@ -53,12 +53,16 @@ func ExtractFunctionNameAndEncoding(subject string) (name string, encoding strin
 	return
 }
 
-func Call(req proto.Message, nc *nats.Conn, subject string, timeout time.Duration) (resp []byte, err error) {
+func Call(req proto.Message, nc *nats.Conn, subject string, encoding string, timeout time.Duration) (resp []byte, err error) {
 	// encode request
-	rawRequest, err := proto.Marshal(req)
+	rawRequest, err := Marshal(encoding, req)
 	if err != nil {
 		log.Printf("nrpc: inner request marshal failed: %v", err)
 		return
+	}
+
+	if encoding != "protobuf" {
+		subject += "." + encoding
 	}
 
 	// call
@@ -70,7 +74,7 @@ func Call(req proto.Message, nc *nats.Conn, subject string, timeout time.Duratio
 
 	// decode rpc reponse
 	var response RPCResponse
-	if err = proto.Unmarshal(msg.Data, &response); err != nil {
+	if err = Unmarshal(encoding, msg.Data, &response); err != nil {
 		log.Printf("nrpc: response unmarshal failed: %v", err)
 		return
 	}

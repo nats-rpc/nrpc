@@ -169,6 +169,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 type {{.GetName}}Client struct {
 	nc      *nats.Conn
 	Subject string
+	Encoding string
 	Timeout time.Duration
 }
 
@@ -176,6 +177,7 @@ func New{{.GetName}}Client(nc *nats.Conn) *{{.GetName}}Client {
 	return &{{.GetName}}Client{
 		nc:      nc,
 		Subject: "{{.GetName}}",
+		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}
 }
@@ -187,7 +189,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 {{- end}}
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".{{.GetName}}", c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".{{.GetName}}", c.Encoding, c.Timeout)
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues("{{.GetName}}",
@@ -197,7 +199,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 	}
 
 	// decode inner reponse
-	if err = proto.Unmarshal(respBytes, &resp); err != nil {
+	if err = Unmarshal(c.Encoding, respBytes, &resp); err != nil {
 		log.Printf("{{.GetName}}: response unmarshal failed: %v", err)
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues("{{.GetName}}",

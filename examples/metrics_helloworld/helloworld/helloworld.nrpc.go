@@ -137,6 +137,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 type GreeterClient struct {
 	nc      *nats.Conn
 	Subject string
+	Encoding string
 	Timeout time.Duration
 }
 
@@ -144,6 +145,7 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 	return &GreeterClient{
 		nc:      nc,
 		Subject: "Greeter",
+		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}
 }
@@ -152,7 +154,7 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 	start := time.Now()
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
 	if err != nil {
 		clientCallsForGreeter.WithLabelValues("SayHello",
 			"call_fail").Inc()
@@ -160,7 +162,7 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 	}
 
 	// decode inner reponse
-	if err = proto.Unmarshal(respBytes, &resp); err != nil {
+	if err = Unmarshal(c.Encoding, respBytes, &resp); err != nil {
 		log.Printf("SayHello: response unmarshal failed: %v", err)
 		clientCallsForGreeter.WithLabelValues("SayHello",
 			"protobuf_fail").Inc()

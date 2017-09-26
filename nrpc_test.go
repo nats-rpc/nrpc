@@ -27,7 +27,7 @@ func TestBasic(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	resp, err := Call(&DummyMessage{"hello"}, nc, "foo.bar", 5*time.Second)
+	resp, err := Call(&DummyMessage{"hello"}, nc, "foo.bar", "protobuf", 5*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestDecode(t *testing.T) {
 	var names = []string{"lorem", "ipsum", "dolor"}
 	for _, n := range names {
 		name = n
-		resp, err := Call(&DummyMessage{"hello"}, nc, "foo."+name, 5*time.Second)
+		resp, err := Call(&DummyMessage{"hello"}, nc, "foo."+name, "protobuf", 5*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -98,7 +98,7 @@ func TestError(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	_, err = Call(&DummyMessage{"hello"}, nc, "foo.bar", 5*time.Second)
+	_, err = Call(&DummyMessage{"hello"}, nc, "foo.bar", "protobuf", 5*time.Second)
 	if err == nil {
 		t.Fatal("error expected")
 	}
@@ -125,7 +125,7 @@ func TestTimeout(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	_, err = Call(&DummyMessage{"hello"}, nc, "foo.bar", 500*time.Millisecond)
+	_, err = Call(&DummyMessage{"hello"}, nc, "foo.bar", "protobuf", 500*time.Millisecond)
 	if err == nil {
 		t.Fatal("error expected")
 	} else if err.Error() != "nats: timeout" {
