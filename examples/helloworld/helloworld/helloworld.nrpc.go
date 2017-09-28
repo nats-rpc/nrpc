@@ -96,7 +96,7 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 	}
 
 	// decode inner reponse
-	if err = Unmarshal(c.Encoding, respBytes, &resp); err != nil {
+	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
 		log.Printf("SayHello: response unmarshal failed: %v", err)
 		return
 	}

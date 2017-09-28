@@ -199,7 +199,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 	}
 
 	// decode inner reponse
-	if err = Unmarshal(c.Encoding, respBytes, &resp); err != nil {
+	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
 		log.Printf("{{.GetName}}: response unmarshal failed: %v", err)
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues("{{.GetName}}",
