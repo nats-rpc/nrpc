@@ -52,7 +52,7 @@ var (
 				"service": "Greeter",
 			},
 		},
-		[]string{"method", "result_type"})
+		[]string{"method", "encoding", "result_type"})
 
 	// The counts of requests handled by the server, classified by result type.
 	serverRequestsForGreeter = prometheus.NewCounterVec(
@@ -63,7 +63,7 @@ var (
 				"service": "Greeter",
 			},
 		},
-		[]string{"method", "result_type"})
+		[]string{"method", "encoding", "result_type"})
 )
 
 // GreeterHandler provides a NATS subscription handler that can serve a
@@ -83,12 +83,12 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "Greeter.*"
+	return "Greeter.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
-	// extract method name from subject
-	name := nrpc.ExtractFunctionName(msg.Subject)
+	// extract method name & encoding from subject
+	name, encoding, err := nrpc.ExtractFunctionNameAndEncoding(msg.Subject)
 
 	// call handler and form response
 	var resp proto.Message
@@ -97,11 +97,11 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	switch name {
 	case "SayHello":
 		var req HelloRequest
-		if err := proto.Unmarshal(msg.Data, &req); err != nil {
+		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
 			errstr = "bad request received: " + err.Error()
-			serverRequestsForGreeter.WithLabelValues("SayHello",
-				"protobuf_fail").Inc()
+			serverRequestsForGreeter.WithLabelValues(
+				"SayHello", encoding, "unmarshal_fail").Inc()
 		} else {
 			start := time.Now()
 			innerResp, err := h.server.SayHello(h.ctx, req)
@@ -109,8 +109,8 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 			if err != nil {
 				log.Printf("SayHelloHandler: SayHello handler failed: %v", err)
 				errstr = err.Error()
-				serverRequestsForGreeter.WithLabelValues("SayHello",
-					"handler_fail").Inc()
+				serverRequestsForGreeter.WithLabelValues(
+					"SayHello", encoding, "handler_fail").Inc()
 			} else {
 				resp = &innerResp
 			}
@@ -118,16 +118,18 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	default:
 		log.Printf("GreeterHandler: unknown name %q", name)
 		errstr = "unknown name: " + name
-		serverRequestsForGreeter.WithLabelValues("Greeter",
-			"name_fail").Inc()
+		serverRequestsForGreeter.WithLabelValues(
+			"Greeter", encoding, "name_fail").Inc()
 	}
 
 	// encode and send response
-	err := nrpc.Publish(resp, errstr, h.nc, msg.Reply) // error is logged
+	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply, encoding) // error is logged
 	if err != nil {
-		serverRequestsForGreeter.WithLabelValues(name, "protobuf_fail").Inc()
+		serverRequestsForGreeter.WithLabelValues(
+			name, encoding, "sendreply_fail").Inc()
 	} else if len(errstr) == 0 {
-		serverRequestsForGreeter.WithLabelValues(name, "success").Inc()
+		serverRequestsForGreeter.WithLabelValues(
+			name, encoding, "success").Inc()
 	}
 
 	// report metric to Prometheus
@@ -137,6 +139,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 type GreeterClient struct {
 	nc      *nats.Conn
 	Subject string
+	Encoding string
 	Timeout time.Duration
 }
 
@@ -144,6 +147,7 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 	return &GreeterClient{
 		nc:      nc,
 		Subject: "Greeter",
+		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}
 }
@@ -152,26 +156,26 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 	start := time.Now()
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
 	if err != nil {
-		clientCallsForGreeter.WithLabelValues("SayHello",
-			"call_fail").Inc()
+		clientCallsForGreeter.WithLabelValues(
+			"SayHello", c.Encoding, "call_fail").Inc()
 		return // already logged
 	}
 
 	// decode inner reponse
-	if err = proto.Unmarshal(respBytes, &resp); err != nil {
+	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
 		log.Printf("SayHello: response unmarshal failed: %v", err)
-		clientCallsForGreeter.WithLabelValues("SayHello",
-			"protobuf_fail").Inc()
+		clientCallsForGreeter.WithLabelValues(
+			"SayHello", c.Encoding, "unmarshal_fail").Inc()
 		return
 	}
 
 	// report total time taken to Prometheus
 	elapsed := time.Since(start).Seconds()
 	clientRCTForGreeter.WithLabelValues("SayHello").Observe(elapsed)
-	clientCallsForGreeter.WithLabelValues("SayHello",
-		"success").Inc()
+	clientCallsForGreeter.WithLabelValues(
+		"SayHello", c.Encoding, "success").Inc()
 
 	return
 }

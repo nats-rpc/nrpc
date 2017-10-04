@@ -34,12 +34,12 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "Greeter.*"
+	return "Greeter.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
-	// extract method name from subject
-	name := nrpc.ExtractFunctionName(msg.Subject)
+	// extract method name & encoding from subject
+	name, encoding, err := nrpc.ExtractFunctionNameAndEncoding(msg.Subject)
 
 	// call handler and form response
 	var resp proto.Message
@@ -47,7 +47,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	switch name {
 	case "SayHello":
 		var req HelloRequest
-		if err := proto.Unmarshal(msg.Data, &req); err != nil {
+		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
 			errstr = "bad request received: " + err.Error()
 		} else {
@@ -65,7 +65,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	}
 
 	// encode and send response
-	err := nrpc.Publish(resp, errstr, h.nc, msg.Reply) // error is logged
+	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply, encoding) // error is logged
 	if err != nil {
 		log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
 	}
@@ -74,6 +74,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 type GreeterClient struct {
 	nc      *nats.Conn
 	Subject string
+	Encoding string
 	Timeout time.Duration
 }
 
@@ -81,6 +82,7 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 	return &GreeterClient{
 		nc:      nc,
 		Subject: "Greeter",
+		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}
 }
@@ -88,13 +90,13 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Timeout)
+	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
 	}
 
 	// decode inner reponse
-	if err = proto.Unmarshal(respBytes, &resp); err != nil {
+	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
 		log.Printf("SayHello: response unmarshal failed: %v", err)
 		return
 	}
