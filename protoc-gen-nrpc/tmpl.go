@@ -104,7 +104,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 
 	// call handler and form response
 	var resp proto.Message
-	var errstr string
+	var replyError *nrpc.Error
 {{- if Prometheus}}
 	var elapsed float64
 {{- end}}
@@ -114,7 +114,10 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		var req {{GetPkg $pkgName .GetInputType}}
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("{{.GetName}}Handler: {{.GetName}} request unmarshal failed: %v", err)
-			errstr = "bad request received: " + err.Error()
+			replyError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
 {{- if Prometheus}}
 			serverRequestsFor{{$serviceName}}.WithLabelValues(
 				"{{.GetName}}", encoding, "unmarshal_fail").Inc()
@@ -129,7 +132,14 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 			if err != nil {
 				log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed: %v", err)
-				errstr = err.Error()
+				if e, ok := err.(*nrpc.Error); ok {
+					replyError = e
+				} else {
+					replyError = &nrpc.Error{
+						Type: nrpc.Error_CLIENT,
+						Message: err.Error(),
+					}
+				}
 {{- if Prometheus}}
 				serverRequestsFor{{$serviceName}}.WithLabelValues(
 					"{{.GetName}}", encoding, "handler_fail").Inc()
@@ -141,7 +151,10 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 	default:
 		log.Printf("{{.GetName}}Handler: unknown name %q", name)
-		errstr = "unknown name: " + name
+		replyError = &nrpc.Error{
+			Type: nrpc.Error_CLIENT,
+			Message: "unknown name: " + name,
+		}
 {{- if Prometheus}}
 		serverRequestsFor{{.GetName}}.WithLabelValues(
 			"{{.GetName}}", encoding, "name_fail").Inc()
@@ -149,12 +162,12 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	}
 
 	// encode and send response
-	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply, encoding) // error is logged
+	err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, encoding) // error is logged
 {{- if Prometheus}}
 	if err != nil {
 		serverRequestsFor{{$serviceName}}.WithLabelValues(
 			name, encoding, "sendreply_fail").Inc()
-	} else if len(errstr) == 0 {
+	} else if replyError == nil {
 		serverRequestsFor{{$serviceName}}.WithLabelValues(
 			name, encoding, "success").Inc()
 	}

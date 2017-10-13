@@ -23,7 +23,7 @@ func TestBasic(t *testing.T) {
 	defer nc.Close()
 
 	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
-		if err := nrpc.Publish(&DummyMessage{"world"}, "", nc, m.Reply, "protobuf"); err != nil {
+		if err := nrpc.Publish(&DummyMessage{"world"}, nil, nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -60,7 +60,7 @@ func TestDecode(t *testing.T) {
 			t.Fatal(err)
 		} else if dm.Foobar != "hello" {
 			t.Fatal("unexpected inner request: " + dm.Foobar)
-		} else if err := nrpc.Publish(&DummyMessage{"world"}, "", nc, m.Reply, "protobuf"); err != nil {
+		} else if err := nrpc.Publish(&DummyMessage{"world"}, nil, nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -111,7 +111,7 @@ func TestReply(t *testing.T) {
 				},
 			}
 		}
-		if err := nrpc.Publish(&dr, "", nc, m.Reply, "protobuf"); err != nil {
+		if err := nrpc.Publish(&dr, nil, nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -182,7 +182,11 @@ func TestError(t *testing.T) {
 	defer nc.Close()
 
 	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
-		if err := nrpc.Publish(&DummyMessage{"world"}, "anerror", nc, m.Reply, "protobuf"); err != nil {
+		if err := nrpc.Publish(
+			&DummyMessage{"world"},
+			&nrpc.Error{Type: nrpc.Error_CLIENT, Message: "anerror"},
+			nc, m.Reply, "protobuf",
+		); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -209,7 +213,7 @@ func TestTimeout(t *testing.T) {
 
 	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
 		time.Sleep(time.Second)
-		if err := nrpc.Publish(&DummyMessage{"world"}, "", nc, m.Reply, "protobuf"); err != nil {
+		if err := nrpc.Publish(&DummyMessage{"world"}, nil, nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})

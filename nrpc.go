@@ -113,30 +113,30 @@ func Call(req proto.Message, rep proto.Message, nc *nats.Conn, subject string, e
 	return nil
 }
 
-func Publish(resp proto.Message, errstr string, nc *nats.Conn, subject string, encoding string) (err error) {
+func Publish(resp proto.Message, withError *Error, nc *nats.Conn, subject string, encoding string) error {
 	if _, ok := resp.(Reply); !ok {
 		// wrap the response in a RPCResponse
-		if len(errstr) == 0 { // send any inner object only if error is unset
-			var inner []byte
-			inner, err = Marshal(encoding, resp)
+		if withError == nil { // send any inner object only if error is unset
+			inner, err := Marshal(encoding, resp)
 			if err != nil {
 				log.Printf("nrpc: inner response marshal failed: %v", err)
 				// Don't return here. Send back a response to the caller.
-				errstr = "nrpc: inner response marshal failed server-side"
-				inner = nil
+				withError = &Error{
+					Type:    Error_SERVER,
+					Message: "nrpc: inner response marshal failed server-side",
+				}
+			} else {
+				resp = &RPCResponse{
+					Reply: &RPCResponse_Result{
+						Result: inner,
+					},
+				}
 			}
-			resp = &RPCResponse{
-				Reply: &RPCResponse_Result{
-					Result: inner,
-				},
-			}
-		} else {
+		}
+		if withError != nil {
 			resp = &RPCResponse{
 				Reply: &RPCResponse_Error{
-					Error: &Error{
-						Type:    Error_CLIENT,
-						Message: errstr,
-					},
+					Error: withError,
 				},
 			}
 		}
@@ -145,12 +145,13 @@ func Publish(resp proto.Message, errstr string, nc *nats.Conn, subject string, e
 	rawResponse, err := Marshal(encoding, resp)
 	if err != nil {
 		log.Printf("nrpc: rpc response marshal failed: %v", err)
-		return
+		return err
 	}
 
 	// send response
-	if err = nc.Publish(subject, rawResponse); err != nil {
+	if err := nc.Publish(subject, rawResponse); err != nil {
 		log.Printf("nrpc: response publish failed: %v", err)
+		return err
 	}
 
 	return nil

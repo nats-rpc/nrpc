@@ -43,29 +43,42 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 
 	// call handler and form response
 	var resp proto.Message
-	var errstr string
+	var replyError *nrpc.Error
 	switch name {
 	case "SayHello":
 		var req HelloRequest
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
-			errstr = "bad request received: " + err.Error()
+			replyError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
 		} else {
 			innerResp, err := h.server.SayHello(h.ctx, req)
 			if err != nil {
 				log.Printf("SayHelloHandler: SayHello handler failed: %v", err)
-				errstr = err.Error()
+				if e, ok := err.(*nrpc.Error); ok {
+					replyError = e
+				} else {
+					replyError = &nrpc.Error{
+						Type: nrpc.Error_CLIENT,
+						Message: err.Error(),
+					}
+				}
 			} else {
 				resp = &innerResp
 			}
 		}
 	default:
 		log.Printf("GreeterHandler: unknown name %q", name)
-		errstr = "unknown name: " + name
+		replyError = &nrpc.Error{
+			Type: nrpc.Error_CLIENT,
+			Message: "unknown name: " + name,
+		}
 	}
 
 	// encode and send response
-	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply, encoding) // error is logged
+	err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, encoding) // error is logged
 	if err != nil {
 		log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
 	}
