@@ -84,6 +84,96 @@ func TestDecode(t *testing.T) {
 	}
 }
 
+func TestReply(t *testing.T) {
+	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	subn, err := nc.Subscribe("foo", func(m *nats.Msg) {
+		var (
+			dm DummyMessage
+		)
+		if err := nrpc.Unmarshal("protobuf", m.Data, &dm); err != nil {
+			t.Fatal(err)
+		}
+		var dr DummyReply
+		if dm.Foobar == "Hi" {
+			dr.Reply = &DummyReply_Foobar{
+				Foobar: dm.Foobar,
+			}
+		} else {
+			dr.Reply = &DummyReply_Error{
+				Error: &nrpc.Error{
+					Type:    nrpc.Error_CLIENT,
+					Message: "You did not say Hi",
+				},
+			}
+		}
+		if err := nrpc.Publish(&dr, "", nc, m.Reply, "protobuf"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	defer subn.Unsubscribe()
+
+	t.Run("Publish", func(t *testing.T) {
+
+		data, err := nrpc.Marshal("protobuf", &DummyMessage{"Hi"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		reply, err := nc.Request("foo", data, 5*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var dr DummyReply
+		if err := nrpc.Unmarshal("protobuf", reply.Data, &dr); err != nil {
+			t.Fatal(err)
+		}
+		if dr.GetError() != nil {
+			t.Fatal("Got error:", dr.GetError())
+		}
+		if dr.GetFoobar() != "Hi" {
+			t.Fatal("Shoud receive 'Hi', got", dr.GetFoobar())
+		}
+	})
+
+	t.Run("Call", func(t *testing.T) {
+		var (
+			dm = DummyMessage{"Hi"}
+			dr DummyReply
+		)
+		if err := nrpc.Call(&dm, &dr, nc, "foo", "protobuf", 5*time.Second); err != nil {
+			t.Fatal(err)
+		}
+		if dr.GetError() != nil {
+			t.Error("Unexpected error:", dr.GetError())
+		}
+		if dr.GetFoobar() != "Hi" {
+			t.Error("Should get 'Hi', got", dr.GetFoobar())
+		}
+	})
+
+	t.Run("Call with Error", func(t *testing.T) {
+		var (
+			dm = DummyMessage{"Not Hi"}
+			dr DummyReply
+		)
+		err := nrpc.Call(&dm, &dr, nc, "foo", "protobuf", 5*time.Second)
+		if err == nil {
+			t.Fatal("Should be an error, got none")
+		}
+		e, isError := err.(*nrpc.Error)
+		if !isError {
+			t.Fatal("err should be a *nrpc.Error, but is", e)
+		}
+		if e.GetMessage() != "You did not say Hi" {
+			t.Error("Error message should be 'You did not say Hi', got", e.GetMessage())
+		}
+	})
+}
+
 func TestError(t *testing.T) {
 	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
 	if err != nil {

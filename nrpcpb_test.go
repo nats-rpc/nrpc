@@ -9,12 +9,14 @@ It is generated from these files:
 
 It has these top-level messages:
 	DummyMessage
+	DummyReply
 */
 package nrpc_test
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
+import nrpc "github.com/rapidloop/nrpc"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -43,18 +45,139 @@ func (m *DummyMessage) GetFoobar() string {
 	return ""
 }
 
+type DummyReply struct {
+	// Types that are valid to be assigned to Reply:
+	//	*DummyReply_Foobar
+	//	*DummyReply_Error
+	Reply isDummyReply_Reply `protobuf_oneof:"reply"`
+}
+
+func (m *DummyReply) Reset()                    { *m = DummyReply{} }
+func (m *DummyReply) String() string            { return proto.CompactTextString(m) }
+func (*DummyReply) ProtoMessage()               {}
+func (*DummyReply) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+type isDummyReply_Reply interface {
+	isDummyReply_Reply()
+}
+
+type DummyReply_Foobar struct {
+	Foobar string `protobuf:"bytes,1,opt,name=foobar,oneof"`
+}
+type DummyReply_Error struct {
+	Error *nrpc.Error `protobuf:"bytes,2,opt,name=error,oneof"`
+}
+
+func (*DummyReply_Foobar) isDummyReply_Reply() {}
+func (*DummyReply_Error) isDummyReply_Reply()  {}
+
+func (m *DummyReply) GetReply() isDummyReply_Reply {
+	if m != nil {
+		return m.Reply
+	}
+	return nil
+}
+
+func (m *DummyReply) GetFoobar() string {
+	if x, ok := m.GetReply().(*DummyReply_Foobar); ok {
+		return x.Foobar
+	}
+	return ""
+}
+
+func (m *DummyReply) GetError() *nrpc.Error {
+	if x, ok := m.GetReply().(*DummyReply_Error); ok {
+		return x.Error
+	}
+	return nil
+}
+
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*DummyReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _DummyReply_OneofMarshaler, _DummyReply_OneofUnmarshaler, _DummyReply_OneofSizer, []interface{}{
+		(*DummyReply_Foobar)(nil),
+		(*DummyReply_Error)(nil),
+	}
+}
+
+func _DummyReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*DummyReply)
+	// reply
+	switch x := m.Reply.(type) {
+	case *DummyReply_Foobar:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		b.EncodeStringBytes(x.Foobar)
+	case *DummyReply_Error:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("DummyReply.Reply has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _DummyReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*DummyReply)
+	switch tag {
+	case 1: // reply.foobar
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeStringBytes()
+		m.Reply = &DummyReply_Foobar{x}
+		return true, err
+	case 2: // reply.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(nrpc.Error)
+		err := b.DecodeMessage(msg)
+		m.Reply = &DummyReply_Error{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _DummyReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*DummyReply)
+	// reply
+	switch x := m.Reply.(type) {
+	case *DummyReply_Foobar:
+		n += proto.SizeVarint(1<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(len(x.Foobar)))
+		n += len(x.Foobar)
+	case *DummyReply_Error:
+		s := proto.Size(x.Error)
+		n += proto.SizeVarint(2<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
+}
+
 func init() {
 	proto.RegisterType((*DummyMessage)(nil), "DummyMessage")
+	proto.RegisterType((*DummyReply)(nil), "DummyReply")
 }
 
 func init() { proto.RegisterFile("nrpc_test.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 81 bytes of a gzipped FileDescriptorProto
+	// 141 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xe2, 0xcf, 0x2b, 0x2a, 0x48,
-	0x8e, 0x2f, 0x49, 0x2d, 0x2e, 0xd1, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x57, 0x52, 0xe3, 0xe2, 0x71,
-	0x29, 0xcd, 0xcd, 0xad, 0xf4, 0x4d, 0x2d, 0x2e, 0x4e, 0x4c, 0x4f, 0x15, 0x12, 0xe3, 0x62, 0x4b,
-	0xcb, 0xcf, 0x4f, 0x4a, 0x2c, 0x92, 0x60, 0x54, 0x60, 0xd4, 0xe0, 0x0c, 0x82, 0xf2, 0x92, 0xd8,
-	0xc0, 0xca, 0x8d, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0xac, 0xbb, 0x57, 0x81, 0x41, 0x00, 0x00,
-	0x00,
+	0x8e, 0x2f, 0x49, 0x2d, 0x2e, 0xd1, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x97, 0xe2, 0x02, 0x09, 0x40,
+	0xd8, 0x4a, 0x6a, 0x5c, 0x3c, 0x2e, 0xa5, 0xb9, 0xb9, 0x95, 0xbe, 0xa9, 0xc5, 0xc5, 0x89, 0xe9,
+	0xa9, 0x42, 0x62, 0x5c, 0x6c, 0x69, 0xf9, 0xf9, 0x49, 0x89, 0x45, 0x12, 0x8c, 0x0a, 0x8c, 0x1a,
+	0x9c, 0x41, 0x50, 0x9e, 0x52, 0x08, 0x17, 0x17, 0x58, 0x5d, 0x50, 0x6a, 0x41, 0x4e, 0xa5, 0x90,
+	0x04, 0xaa, 0x2a, 0x0f, 0x06, 0x98, 0x3a, 0x21, 0x65, 0x2e, 0xd6, 0xd4, 0xa2, 0xa2, 0xfc, 0x22,
+	0x09, 0x26, 0x05, 0x46, 0x0d, 0x6e, 0x23, 0x6e, 0x3d, 0xb0, 0x5d, 0xae, 0x20, 0x21, 0x0f, 0x86,
+	0x20, 0x88, 0x9c, 0x13, 0x3b, 0x17, 0x6b, 0x11, 0xc8, 0x9c, 0x24, 0x36, 0xb0, 0x23, 0x8c, 0x01,
+	0x01, 0x00, 0x00, 0xff, 0xff, 0x9f, 0xfa, 0x41, 0xe7, 0xa3, 0x00, 0x00, 0x00,
 }
