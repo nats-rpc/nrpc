@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -155,4 +156,29 @@ func Publish(resp proto.Message, withError *Error, nc *nats.Conn, subject string
 	}
 
 	return nil
+}
+
+// CaptureErrors runs a handler and convert error and panics into proper Error
+func CaptureErrors(fn func() (proto.Message, error)) (msg proto.Message, replyError *Error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Caught panic: %s\n%s", r, debug.Stack())
+			replyError = &Error{
+				Type:    Error_SERVER,
+				Message: fmt.Sprint(r),
+			}
+		}
+	}()
+	var err error
+	msg, err = fn()
+	if err != nil {
+		var ok bool
+		if replyError, ok = err.(*Error); !ok {
+			replyError = &Error{
+				Type:    Error_CLIENT,
+				Message: err.Error(),
+			}
+		}
+	}
+	return
 }

@@ -54,19 +54,16 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 				Message: "bad request received: " + err.Error(),
 			}
 		} else {
-			innerResp, err := h.server.SayHello(h.ctx, req)
-			if err != nil {
-				log.Printf("SayHelloHandler: SayHello handler failed: %v", err)
-				if e, ok := err.(*nrpc.Error); ok {
-					replyError = e
-				} else {
-					replyError = &nrpc.Error{
-						Type: nrpc.Error_CLIENT,
-						Message: err.Error(),
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					innerResp, err := h.server.SayHello(h.ctx, req)
+					if err != nil {
+						return nil, err
 					}
-				}
-			} else {
-				resp = &innerResp
+					return &innerResp, err
+				})
+			if replyError != nil {
+				log.Printf("SayHelloHandler: SayHello handler failed: %s", replyError.Error())
 			}
 		}
 	default:

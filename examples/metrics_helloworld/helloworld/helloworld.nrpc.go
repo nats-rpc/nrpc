@@ -107,22 +107,19 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 				"SayHello", encoding, "unmarshal_fail").Inc()
 		} else {
 			start := time.Now()
-			innerResp, err := h.server.SayHello(h.ctx, req)
-			elapsed = time.Since(start).Seconds()
-			if err != nil {
-				log.Printf("SayHelloHandler: SayHello handler failed: %v", err)
-				if e, ok := err.(*nrpc.Error); ok {
-					replyError = e
-				} else {
-					replyError = &nrpc.Error{
-						Type: nrpc.Error_CLIENT,
-						Message: err.Error(),
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					innerResp, err := h.server.SayHello(h.ctx, req)
+					if err != nil {
+						return nil, err
 					}
-				}
+					return &innerResp, err
+				})
+			elapsed = time.Since(start).Seconds()
+			if replyError != nil {
+				log.Printf("SayHelloHandler: SayHello handler failed: %s", replyError.Error())
 				serverRequestsForGreeter.WithLabelValues(
 					"SayHello", encoding, "handler_fail").Inc()
-			} else {
-				resp = &innerResp
 			}
 		}
 	default:

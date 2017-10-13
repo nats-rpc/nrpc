@@ -2,6 +2,7 @@ package nrpc_test
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -302,4 +303,73 @@ func TestExtractFunctionNameAndEncoding(t *testing.T) {
 			t.Errorf("Expected error '%s', got '%s'", tt.err, err)
 		}
 	}
+}
+
+func TestCaptureErrors(t *testing.T) {
+	t.Run("NoError", func(t *testing.T) {
+		msg, err := nrpc.CaptureErrors(func() (proto.Message, error) {
+			return &DummyMessage{"Hi"}, nil
+		})
+		if err != nil {
+			t.Error("Unexpected error:", err)
+		}
+		dm, ok := msg.(*DummyMessage)
+		if !ok {
+			t.Error("Expected a DummyMessage, got", msg)
+		}
+		if dm.Foobar != "Hi" {
+			t.Error("Message was not passed properly")
+		}
+	})
+	t.Run("ClientError", func(t *testing.T) {
+		msg, err := nrpc.CaptureErrors(func() (proto.Message, error) {
+			return nil, fmt.Errorf("anerror")
+		})
+		if err == nil {
+			t.Fatal("Expected an error, got nothing")
+		}
+		if err.Type != nrpc.Error_CLIENT {
+			t.Errorf("Invalid error type. Expected 'CLIENT' (0), got %s", err.Type)
+		}
+		if err.Message != "anerror" {
+			t.Error("Unexpected error message. Expected 'anerror', got", err.Message)
+		}
+		if msg != nil {
+			t.Error("Expected a nil msg, got", msg)
+		}
+	})
+	t.Run("DirectError", func(t *testing.T) {
+		msg, err := nrpc.CaptureErrors(func() (proto.Message, error) {
+			return nil, &nrpc.Error{Type: nrpc.Error_SERVER, Message: "anerror"}
+		})
+		if err == nil {
+			t.Fatal("Expected an error, got nothing")
+		}
+		if err.Type != nrpc.Error_SERVER {
+			t.Errorf("Invalid error type. Expected 'SERVER' (1), got %s", err.Type)
+		}
+		if err.Message != "anerror" {
+			t.Error("Unexpected error message. Expected 'anerror', got", err.Message)
+		}
+		if msg != nil {
+			t.Error("Expected a nil msg, got", msg)
+		}
+	})
+	t.Run("ServerError", func(t *testing.T) {
+		msg, err := nrpc.CaptureErrors(func() (proto.Message, error) {
+			panic("panicking")
+		})
+		if err == nil {
+			t.Fatal("Expected an error, got nothing")
+		}
+		if err.Type != nrpc.Error_SERVER {
+			t.Errorf("Invalid error type. Expected 'SERVER' (1), got %s", err.Type)
+		}
+		if err.Message != "panicking" {
+			t.Error("Unexpected error message. Expected 'panicking', got", err.Message)
+		}
+		if msg != nil {
+			t.Error("Expected a nil msg, got", msg)
+		}
+	})
 }

@@ -126,26 +126,23 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- if Prometheus}}
 			start := time.Now()
 {{- end}}
-			innerResp, err := h.server.{{.GetName}}(h.ctx, req)
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					innerResp, err := h.server.{{.GetName}}(h.ctx, req)
+					if err != nil {
+						return nil, err
+					}
+					return &innerResp, err
+				})
 {{- if Prometheus}}
 			elapsed = time.Since(start).Seconds()
 {{- end}}
-			if err != nil {
-				log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed: %v", err)
-				if e, ok := err.(*nrpc.Error); ok {
-					replyError = e
-				} else {
-					replyError = &nrpc.Error{
-						Type: nrpc.Error_CLIENT,
-						Message: err.Error(),
-					}
-				}
+			if replyError != nil {
+				log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed: %s", replyError.Error())
 {{- if Prometheus}}
 				serverRequestsFor{{$serviceName}}.WithLabelValues(
 					"{{.GetName}}", encoding, "handler_fail").Inc()
 {{- end}}
-			} else {
-				resp = &innerResp
 			}
 		}
 {{- end}}
