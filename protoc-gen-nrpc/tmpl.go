@@ -191,23 +191,13 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 {{- end}}
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".{{.GetName}}", c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &resp, c.nc, c.Subject+".{{.GetName}}", c.Encoding, c.Timeout)
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(
 			"{{.GetName}}", c.Encoding, "call_fail").Inc()
 {{- end}}
 		return // already logged
-	}
-
-	// decode inner reponse
-	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
-		log.Printf("{{.GetName}}: response unmarshal failed: %v", err)
-{{- if Prometheus}}
-		clientCallsFor{{$serviceName}}.WithLabelValues(
-			"{{.GetName}}", c.Encoding, "unmarshal_fail").Inc()
-{{- end}}
-		return
 	}
 
 {{- if Prometheus}}

@@ -90,15 +90,9 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &resp, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
-	}
-
-	// decode inner reponse
-	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
-		log.Printf("SayHello: response unmarshal failed: %v", err)
-		return
 	}
 
 	return

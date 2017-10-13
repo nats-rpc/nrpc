@@ -27,14 +27,13 @@ func TestBasic(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	resp, err := Call(&DummyMessage{"hello"}, nc, "foo.bar", "protobuf", 5*time.Second)
-	if err != nil {
+	var dm DummyMessage
+	if err := Call(
+		&DummyMessage{"hello"}, &dm, nc, "foo.bar", "protobuf", 5*time.Second,
+	); err != nil {
 		t.Fatal(err)
 	}
-	var dm DummyMessage
-	if err := proto.Unmarshal(resp, &dm); err != nil {
-		t.Fatal(err)
-	} else if dm.Foobar != "world" {
+	if dm.Foobar != "world" {
 		t.Fatal("wrong response: ", string(dm.Foobar))
 	}
 }
@@ -68,14 +67,13 @@ func TestDecode(t *testing.T) {
 	var names = []string{"lorem", "ipsum", "dolor"}
 	for _, n := range names {
 		name = n
-		resp, err := Call(&DummyMessage{"hello"}, nc, "foo."+name, "protobuf", 5*time.Second)
-		if err != nil {
+		var dm DummyMessage
+		if err := Call(
+			&DummyMessage{"hello"}, &dm, nc, "foo."+name, "protobuf", 5*time.Second,
+		); err != nil {
 			t.Fatal(err)
 		}
-		var dm DummyMessage
-		if err := proto.Unmarshal(resp, &dm); err != nil {
-			t.Fatal(err)
-		} else if dm.Foobar != "world" {
+		if dm.Foobar != "world" {
 			t.Fatal("wrong response: ", string(dm.Foobar))
 		}
 	}
@@ -98,11 +96,11 @@ func TestError(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	_, err = Call(&DummyMessage{"hello"}, nc, "foo.bar", "protobuf", 5*time.Second)
+	err = Call(&DummyMessage{"hello"}, &DummyMessage{}, nc, "foo.bar", "protobuf", 5*time.Second)
 	if err == nil {
 		t.Fatal("error expected")
 	}
-	if err.Error() != "anerror" {
+	if err.Error() != "CLIENT error: anerror" {
 		t.Fatal("wrong error: ", err.Error())
 	}
 }
@@ -125,7 +123,7 @@ func TestTimeout(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	_, err = Call(&DummyMessage{"hello"}, nc, "foo.bar", "protobuf", 500*time.Millisecond)
+	err = Call(&DummyMessage{"hello"}, &DummyMessage{}, nc, "foo.bar", "protobuf", 500*time.Millisecond)
 	if err == nil {
 		t.Fatal("error expected")
 	} else if err.Error() != "nats: timeout" {

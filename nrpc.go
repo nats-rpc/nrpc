@@ -3,6 +3,7 @@ package nrpc
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -12,6 +13,15 @@ import (
 )
 
 //go:generate protoc --go_out=../../.. nrpc.proto
+
+type Reply interface {
+	proto.Message
+	GetError() *Error
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("%s error: %s", Error_Type_name[int32(e.Type)], e.Message)
+}
 
 func Unmarshal(encoding string, data []byte, msg proto.Message) error {
 	switch encoding {
@@ -55,12 +65,12 @@ func ExtractFunctionNameAndEncoding(subject string) (name string, encoding strin
 	return
 }
 
-func Call(req proto.Message, nc *nats.Conn, subject string, encoding string, timeout time.Duration) (resp []byte, err error) {
+func Call(req proto.Message, rep proto.Message, nc *nats.Conn, subject string, encoding string, timeout time.Duration) error {
 	// encode request
 	rawRequest, err := Marshal(encoding, req)
 	if err != nil {
 		log.Printf("nrpc: inner request marshal failed: %v", err)
-		return
+		return err
 	}
 
 	if encoding != "protobuf" {
@@ -71,46 +81,68 @@ func Call(req proto.Message, nc *nats.Conn, subject string, encoding string, tim
 	msg, err := nc.Request(subject, rawRequest, timeout)
 	if err != nil {
 		log.Printf("nrpc: nats request failed: %v", err)
-		return
+		return err
+	}
+
+	data := msg.Data
+
+	// If the reply type is not a Reply implementation, if will be encapsulated
+	// in a RPCResponse
+	if _, ok := rep.(Reply); !ok {
+		var response RPCResponse
+		if err = Unmarshal(encoding, data, &response); err != nil {
+			log.Printf("nrpc: response unmarshal failed: %v", err)
+			return err
+		}
+		if response.GetError() != nil {
+			return response.GetError()
+		}
+		data = response.GetResult()
 	}
 
 	// decode rpc reponse
-	var response RPCResponse
-	if err = Unmarshal(encoding, msg.Data, &response); err != nil {
+	if err := Unmarshal(encoding, data, rep); err != nil {
 		log.Printf("nrpc: response unmarshal failed: %v", err)
-		return
+		return err
 	}
 
-	// check error
-	if len(response.Error) > 0 {
-		err = errors.New(response.Error)
-		log.Printf("nrpc: handler failed: %s", response.Error)
-		return
+	if reply, ok := rep.(Reply); ok && reply.GetError() != nil {
+		return reply.GetError()
 	}
 
-	resp = response.Response
-	return
+	return nil
 }
 
 func Publish(resp proto.Message, errstr string, nc *nats.Conn, subject string, encoding string) (err error) {
-	// encode response
-	var inner []byte
-	if len(errstr) == 0 { // send any inner object only if error is unset
-		inner, err = Marshal(encoding, resp)
-		if err != nil {
-			log.Printf("nrpc: inner response marshal failed: %v", err)
-			// Don't return here. Send back a response to the caller.
-			errstr = "nrpc: inner response marshal failed server-side"
-			inner = nil
+	if _, ok := resp.(Reply); !ok {
+		// wrap the response in a RPCResponse
+		if len(errstr) == 0 { // send any inner object only if error is unset
+			var inner []byte
+			inner, err = Marshal(encoding, resp)
+			if err != nil {
+				log.Printf("nrpc: inner response marshal failed: %v", err)
+				// Don't return here. Send back a response to the caller.
+				errstr = "nrpc: inner response marshal failed server-side"
+				inner = nil
+			}
+			resp = &RPCResponse{
+				Reply: &RPCResponse_Result{
+					Result: inner,
+				},
+			}
+		} else {
+			resp = &RPCResponse{
+				Reply: &RPCResponse_Error{
+					Error: &Error{
+						Type:    Error_CLIENT,
+						Message: errstr,
+					},
+				},
+			}
 		}
 	}
 
-	// encode rpc response
-	response := RPCResponse{
-		Error:    errstr,
-		Response: inner,
-	}
-	rawResponse, err := Marshal(encoding, &response)
+	rawResponse, err := Marshal(encoding, resp)
 	if err != nil {
 		log.Printf("nrpc: rpc response marshal failed: %v", err)
 		return

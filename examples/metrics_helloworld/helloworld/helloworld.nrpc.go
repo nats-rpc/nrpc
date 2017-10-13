@@ -156,19 +156,11 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 	start := time.Now()
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &resp, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
 	if err != nil {
 		clientCallsForGreeter.WithLabelValues(
 			"SayHello", c.Encoding, "call_fail").Inc()
 		return // already logged
-	}
-
-	// decode inner reponse
-	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
-		log.Printf("SayHello: response unmarshal failed: %v", err)
-		clientCallsForGreeter.WithLabelValues(
-			"SayHello", c.Encoding, "unmarshal_fail").Inc()
-		return
 	}
 
 	// report total time taken to Prometheus

@@ -4,7 +4,18 @@ package nrpc;
 
 option go_package = "github.com/rapidloop/nrpc";
 
+message Error {
+    enum Type {
+        CLIENT = 0;
+        SERVER = 1;
+    }
+    Type type = 1;
+	string message = 2;
+}
+
 message RPCResponse {
-	string error = 1;
-	bytes response = 2;
+    oneof reply {
+        bytes result = 1;
+        nrpc.Error error = 2;
+    }
 }

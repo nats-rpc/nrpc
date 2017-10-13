@@ -8,6 +8,7 @@ It is generated from these files:
 	nrpc.proto
 
 It has these top-level messages:
+	Error
 	RPCResponse
 */
 package nrpc
@@ -27,44 +28,190 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
+type Error_Type int32
+
+const (
+	Error_CLIENT Error_Type = 0
+	Error_SERVER Error_Type = 1
+)
+
+var Error_Type_name = map[int32]string{
+	0: "CLIENT",
+	1: "SERVER",
+}
+var Error_Type_value = map[string]int32{
+	"CLIENT": 0,
+	"SERVER": 1,
+}
+
+func (x Error_Type) String() string {
+	return proto.EnumName(Error_Type_name, int32(x))
+}
+func (Error_Type) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0} }
+
+type Error struct {
+	Type    Error_Type `protobuf:"varint,1,opt,name=type,enum=nrpc.Error_Type" json:"type,omitempty"`
+	Message string     `protobuf:"bytes,2,opt,name=message" json:"message,omitempty"`
+}
+
+func (m *Error) Reset()                    { *m = Error{} }
+func (m *Error) String() string            { return proto.CompactTextString(m) }
+func (*Error) ProtoMessage()               {}
+func (*Error) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+func (m *Error) GetType() Error_Type {
+	if m != nil {
+		return m.Type
+	}
+	return Error_CLIENT
+}
+
+func (m *Error) GetMessage() string {
+	if m != nil {
+		return m.Message
+	}
+	return ""
+}
+
 type RPCResponse struct {
-	Error    string `protobuf:"bytes,1,opt,name=error" json:"error,omitempty"`
-	Response []byte `protobuf:"bytes,2,opt,name=response,proto3" json:"response,omitempty"`
+	// Types that are valid to be assigned to Reply:
+	//	*RPCResponse_Result
+	//	*RPCResponse_Error
+	Reply isRPCResponse_Reply `protobuf_oneof:"reply"`
 }
 
 func (m *RPCResponse) Reset()                    { *m = RPCResponse{} }
 func (m *RPCResponse) String() string            { return proto.CompactTextString(m) }
 func (*RPCResponse) ProtoMessage()               {}
-func (*RPCResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+func (*RPCResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
-func (m *RPCResponse) GetError() string {
-	if m != nil {
-		return m.Error
-	}
-	return ""
+type isRPCResponse_Reply interface {
+	isRPCResponse_Reply()
 }
 
-func (m *RPCResponse) GetResponse() []byte {
+type RPCResponse_Result struct {
+	Result []byte `protobuf:"bytes,1,opt,name=result,proto3,oneof"`
+}
+type RPCResponse_Error struct {
+	Error *Error `protobuf:"bytes,2,opt,name=error,oneof"`
+}
+
+func (*RPCResponse_Result) isRPCResponse_Reply() {}
+func (*RPCResponse_Error) isRPCResponse_Reply()  {}
+
+func (m *RPCResponse) GetReply() isRPCResponse_Reply {
 	if m != nil {
-		return m.Response
+		return m.Reply
 	}
 	return nil
 }
 
+func (m *RPCResponse) GetResult() []byte {
+	if x, ok := m.GetReply().(*RPCResponse_Result); ok {
+		return x.Result
+	}
+	return nil
+}
+
+func (m *RPCResponse) GetError() *Error {
+	if x, ok := m.GetReply().(*RPCResponse_Error); ok {
+		return x.Error
+	}
+	return nil
+}
+
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*RPCResponse) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _RPCResponse_OneofMarshaler, _RPCResponse_OneofUnmarshaler, _RPCResponse_OneofSizer, []interface{}{
+		(*RPCResponse_Result)(nil),
+		(*RPCResponse_Error)(nil),
+	}
+}
+
+func _RPCResponse_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*RPCResponse)
+	// reply
+	switch x := m.Reply.(type) {
+	case *RPCResponse_Result:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		b.EncodeRawBytes(x.Result)
+	case *RPCResponse_Error:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("RPCResponse.Reply has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _RPCResponse_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*RPCResponse)
+	switch tag {
+	case 1: // reply.result
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeRawBytes(true)
+		m.Reply = &RPCResponse_Result{x}
+		return true, err
+	case 2: // reply.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Reply = &RPCResponse_Error{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _RPCResponse_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*RPCResponse)
+	// reply
+	switch x := m.Reply.(type) {
+	case *RPCResponse_Result:
+		n += proto.SizeVarint(1<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(len(x.Result)))
+		n += len(x.Result)
+	case *RPCResponse_Error:
+		s := proto.Size(x.Error)
+		n += proto.SizeVarint(2<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
+}
+
 func init() {
+	proto.RegisterType((*Error)(nil), "nrpc.Error")
 	proto.RegisterType((*RPCResponse)(nil), "nrpc.RPCResponse")
+	proto.RegisterEnum("nrpc.Error_Type", Error_Type_name, Error_Type_value)
 }
 
 func init() { proto.RegisterFile("nrpc.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 121 bytes of a gzipped FileDescriptorProto
+	// 217 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xe2, 0xca, 0x2b, 0x2a, 0x48,
-	0xd6, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x01, 0xb1, 0x95, 0xec, 0xb9, 0xb8, 0x83, 0x02,
-	0x9c, 0x83, 0x52, 0x8b, 0x0b, 0xf2, 0xf3, 0x8a, 0x53, 0x85, 0x44, 0xb8, 0x58, 0x53, 0x8b, 0x8a,
-	0xf2, 0x8b, 0x24, 0x18, 0x15, 0x18, 0x35, 0x38, 0x83, 0x20, 0x1c, 0x21, 0x29, 0x2e, 0x8e, 0x22,
-	0xa8, 0x0a, 0x09, 0x26, 0x05, 0x46, 0x0d, 0x9e, 0x20, 0x38, 0xdf, 0x49, 0x3a, 0x4a, 0x32, 0x3d,
-	0xb3, 0x24, 0xa3, 0x34, 0x49, 0x2f, 0x39, 0x3f, 0x57, 0xbf, 0x28, 0xb1, 0x20, 0x33, 0x25, 0x27,
-	0x3f, 0xbf, 0x40, 0x1f, 0x64, 0x7a, 0x12, 0x1b, 0xd8, 0x2a, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff,
-	0xff, 0x57, 0x46, 0xed, 0xac, 0x78, 0x00, 0x00, 0x00,
+	0xd6, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x01, 0xb1, 0x95, 0xd2, 0xb9, 0x58, 0x5d, 0x8b,
+	0x8a, 0xf2, 0x8b, 0x84, 0x54, 0xb8, 0x58, 0x4a, 0x2a, 0x0b, 0x52, 0x25, 0x18, 0x15, 0x18, 0x35,
+	0xf8, 0x8c, 0x04, 0xf4, 0xc0, 0x2a, 0xc1, 0x52, 0x7a, 0x21, 0x95, 0x05, 0xa9, 0x41, 0x60, 0x59,
+	0x21, 0x09, 0x2e, 0xf6, 0xdc, 0xd4, 0xe2, 0xe2, 0xc4, 0xf4, 0x54, 0x09, 0x26, 0x05, 0x46, 0x0d,
+	0xce, 0x20, 0x18, 0x57, 0x49, 0x8e, 0x8b, 0x05, 0xa4, 0x4e, 0x88, 0x8b, 0x8b, 0xcd, 0xd9, 0xc7,
+	0xd3, 0xd5, 0x2f, 0x44, 0x80, 0x01, 0xc4, 0x0e, 0x76, 0x0d, 0x0a, 0x73, 0x0d, 0x12, 0x60, 0x54,
+	0x0a, 0xe5, 0xe2, 0x0e, 0x0a, 0x70, 0x0e, 0x4a, 0x2d, 0x2e, 0xc8, 0xcf, 0x2b, 0x06, 0x19, 0xc4,
+	0x56, 0x94, 0x5a, 0x5c, 0x9a, 0x53, 0x02, 0xb6, 0x90, 0xc7, 0x83, 0x21, 0x08, 0xca, 0x17, 0x52,
+	0xe6, 0x62, 0x4d, 0x05, 0x59, 0x0b, 0xb6, 0x80, 0xdb, 0x88, 0x1b, 0xc9, 0x25, 0x1e, 0x0c, 0x41,
+	0x10, 0x39, 0x27, 0x76, 0x2e, 0xd6, 0xa2, 0xd4, 0x82, 0x9c, 0x4a, 0x27, 0xe9, 0x28, 0xc9, 0xf4,
+	0xcc, 0x92, 0x8c, 0xd2, 0x24, 0xbd, 0xe4, 0xfc, 0x5c, 0xfd, 0xa2, 0xc4, 0x82, 0xcc, 0x94, 0x9c,
+	0xfc, 0xfc, 0x02, 0x7d, 0x90, 0xa6, 0x24, 0x36, 0xb0, 0x4f, 0x8d, 0x01, 0x01, 0x00, 0x00, 0xff,
+	0xff, 0x3b, 0x4f, 0x30, 0x24, 0xf7, 0x00, 0x00, 0x00,
 }
