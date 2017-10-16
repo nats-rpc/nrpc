@@ -123,7 +123,7 @@ func main() {
 		log.Fatalf("error: parsing input proto: %v", err)
 	}
 
-	if len(request.FileToGenerate) == 0 {
+	if len(request.GetFileToGenerate()) == 0 {
 		log.Fatal("error: no files to generate")
 	}
 
@@ -134,7 +134,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	for _, fd := range request.ProtoFile {
+	for _, name := range request.GetFileToGenerate() {
+		var fd *descriptor.FileDescriptorProto
+		for _, fd = range request.GetProtoFile() {
+			if name == fd.GetName() {
+				break
+			}
+		}
+		if fd == nil {
+			log.Fatalf("could not find the .proto file for %s", name)
+		}
+
 		var buf bytes.Buffer
 		if err := tmpl.Execute(&buf, fd); err != nil {
 			log.Fatal(err)
