@@ -23,7 +23,8 @@ import (
 // {{.GetName}} should implement.
 type {{.GetName}}Server interface {
 	{{- range .Method}}
-	{{.GetName}}(ctx context.Context, req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName .GetOutputType}}, err error)
+	{{- $resultType := GetResultType .}}
+	{{.GetName}}(ctx context.Context, req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName $resultType}}, err error)
 	{{- end}}
 }
 
@@ -126,6 +127,20 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- if Prometheus}}
 			start := time.Now()
 {{- end}}
+			{{- if HasFullReply . }}
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					result, err := h.server.{{.GetName}}(h.ctx, req)
+					if err != nil {
+						return nil, err
+					}
+					return &{{ GetPkg $pkgName .GetOutputType }}{
+						&{{ GetPkg $pkgName .GetOutputType }}_Result{
+							Result: {{if HasPointerResultType .}}&{{end}}result,
+						},
+					}, err
+				})
+			{{- else}}
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
 					innerResp, err := h.server.{{.GetName}}(h.ctx, req)
@@ -134,6 +149,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 					}
 					return &innerResp, err
 				})
+			{{- end}}
 {{- if Prometheus}}
 			elapsed = time.Since(start).Seconds()
 {{- end}}
@@ -195,13 +211,19 @@ func New{{.GetName}}Client(nc *nats.Conn) *{{.GetName}}Client {
 }
 {{$serviceName := .GetName}}
 {{- range .Method}}
-func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName .GetOutputType}}, err error) {
+{{- $resultType := GetResultType .}}
+func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName $resultType}}, err error) {
 {{- if Prometheus}}
 	start := time.Now()
 {{- end}}
 
 	// call
+	{{- if HasFullReply .}}
+	var reply {{GetPkg $pkgName .GetOutputType}}
+	err = nrpc.Call(&req, &reply, c.nc, c.Subject+".{{.GetName}}", c.Encoding, c.Timeout)
+	{{- else}}
 	err = nrpc.Call(&req, &resp, c.nc, c.Subject+".{{.GetName}}", c.Encoding, c.Timeout)
+	{{- end}}
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(
@@ -209,6 +231,10 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 {{- end}}
 		return // already logged
 	}
+
+	{{- if HasFullReply .}}
+	resp = {{if HasPointerResultType .}}*{{end}}reply.GetResult()
+	{{- end}}
 
 {{- if Prometheus}}
 
