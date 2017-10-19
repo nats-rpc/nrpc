@@ -11,6 +11,8 @@ import (
 	nats "github.com/nats-io/go-nats"
 )
 
+//go:generate protoc --go_out=../../.. nrpc.proto
+
 func Unmarshal(encoding string, data []byte, msg proto.Message) error {
 	switch encoding {
 	case "protobuf":
