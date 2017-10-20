@@ -102,14 +102,14 @@ func (h *{{.GetName}}Handler) Subject() string {
 	return "{{$pkgSubjectPrefix}}
 	{{- range $pkgSubjectParams -}}
 		*.
-	{{- end}}{{.GetName}}.>"
+	{{- end}}{{GetServiceSubject .}}.>"
 }
 
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
 	{{ if ne 0 (len $pkgSubjectParams)}}pkgParams{{else}}_{{end -}}
 	, name, encoding, err := nrpc.ParseSubject(
-		"{{$pkgSubject}}", {{len $pkgSubjectParams}}, "{{.GetName}}", msg.Subject)
+		"{{$pkgSubject}}", {{len $pkgSubjectParams}}, "{{GetServiceSubject .}}", msg.Subject)
 
 	ctx := h.ctx
 	{{- range $i, $name := $pkgSubjectParams }}
@@ -229,7 +229,7 @@ func New{{.GetName}}Client(nc *nats.Conn
 		{{- range $pkgSubjectParams}}
 		PkgParam{{.}}: pkgParam{{.}},
 		{{- end}}
-		Subject: "{{.GetName}}",
+		Subject: "{{GetServiceSubject .}}",
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}

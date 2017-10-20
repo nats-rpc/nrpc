@@ -36,13 +36,13 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "custom.*.Greeter.>"
+	return "custom.*.greeter.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
 	pkgParams, name, encoding, err := nrpc.ParseSubject(
-		"custom", 1, "Greeter", msg.Subject)
+		"custom", 1, "greeter", msg.Subject)
 
 	ctx := h.ctx
 	ctx = context.WithValue(ctx, "nrpc-pkg-language", pkgParams[0])
@@ -150,7 +150,7 @@ func NewGreeterClient(nc *nats.Conn, pkgParamlanguage string) *GreeterClient {
 		nc:      nc,
 		PkgSubject: "custom",
 		PkgParamlanguage: pkgParamlanguage,
-		Subject: "Greeter",
+		Subject: "greeter",
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}

@@ -13,6 +13,11 @@ extend google.protobuf.FileOptions {
     repeated string packageSubjectParams = 50001;
 }
 
+extend google.protobuf.ServiceOptions {
+	// A custom subject token to use instead of the service name
+	string serviceSubject = 50002;
+}
+
 message Error {
     enum Type {
         CLIENT = 0;
