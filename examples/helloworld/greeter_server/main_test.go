@@ -35,7 +35,7 @@ func TestBasic(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	// This is our generated client.
-	cli := helloworld.NewGreeterClient(nc)
+	cli := helloworld.NewGreeterClient(nc, "en", "myid")
 
 	// Contact the server and print out its response.
 	resp, err := cli.SayHello(helloworld.HelloRequest{"world"})
