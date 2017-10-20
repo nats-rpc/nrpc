@@ -102,18 +102,27 @@ func (h *{{.GetName}}Handler) Subject() string {
 	return "{{$pkgSubjectPrefix}}
 	{{- range $pkgSubjectParams -}}
 		*.
-	{{- end}}{{GetServiceSubject .}}.>"
+	{{- end -}}
+	{{GetServiceSubject .}}
+	{{- range GetServiceSubjectParams . -}}
+		.*
+	{{- end -}}
+	.>"
 }
 
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
-	{{ if ne 0 (len $pkgSubjectParams)}}pkgParams{{else}}_{{end -}}
+	{{ if ne 0 (len $pkgSubjectParams)}}pkgParams{{else}}_{{end -}},
+	{{- if ne 0 (len (GetServiceSubjectParams .))}} svcParams{{else}} _{{end -}}
 	, name, encoding, err := nrpc.ParseSubject(
-		"{{$pkgSubject}}", {{len $pkgSubjectParams}}, "{{GetServiceSubject .}}", msg.Subject)
+		"{{$pkgSubject}}", {{len $pkgSubjectParams}}, "{{GetServiceSubject .}}", {{len (GetServiceSubjectParams .)}}, msg.Subject)
 
 	ctx := h.ctx
 	{{- range $i, $name := $pkgSubjectParams }}
 	ctx = context.WithValue(ctx, "nrpc-pkg-{{$name}}", pkgParams[{{$i}}])
+	{{- end }}
+	{{- range $i, $name := GetServiceSubjectParams . }}
+	ctx = context.WithValue(ctx, "nrpc-svc-{{$name}}", svcParams[{{$i}}])
 	{{- end }}
 	// call handler and form response
 	var resp proto.Message
@@ -215,6 +224,9 @@ type {{.GetName}}Client struct {
 	PkgParam{{ . }} string
 	{{- end}}
 	Subject string
+	{{- range GetServiceSubjectParams .}}
+	SvcParam{{ . }} string
+	{{- end}}
 	Encoding string
 	Timeout time.Duration
 }
@@ -222,7 +234,11 @@ type {{.GetName}}Client struct {
 func New{{.GetName}}Client(nc *nats.Conn
 	{{- range $pkgSubjectParams -}}
 	, pkgParam{{.}} string
-	{{- end -}}) *{{.GetName}}Client {
+	{{- end -}}
+	{{- range GetServiceSubjectParams . -}}
+	, svcParam{{ . }} string
+	{{- end -}}
+	) *{{.GetName}}Client {
 	return &{{.GetName}}Client{
 		nc:      nc,
 		PkgSubject: "{{$pkgSubject}}",
@@ -230,11 +246,15 @@ func New{{.GetName}}Client(nc *nats.Conn
 		PkgParam{{.}}: pkgParam{{.}},
 		{{- end}}
 		Subject: "{{GetServiceSubject .}}",
+		{{- range GetServiceSubjectParams .}}
+		SvcParam{{.}}: svcParam{{.}},
+		{{- end}}
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}
 }
 {{$serviceName := .GetName}}
+{{$serviceSubjectParams := GetServiceSubjectParams .}}
 {{- range .Method}}
 {{- $resultType := GetResultType .}}
 func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName $resultType}}, err error) {
@@ -242,7 +262,13 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 	start := time.Now()
 {{- end}}
 
-	subject := {{ if ne 0 (len $pkgSubject) }}c.PkgSubject + "." + {{end}}{{ range $pkgSubjectParams }}c.PkgParam{{.}} + "." + {{end}}c.Subject + ".{{.GetName}}";
+	subject := {{ if ne 0 (len $pkgSubject) -}}
+		c.PkgSubject + "." + {{end}}
+	{{- range $pkgSubjectParams -}}
+	    c.PkgParam{{.}} + "." + {{end -}}
+	c.Subject + "." + {{range $serviceSubjectParams -}}
+	    c.SvcParam{{.}} + "." + {{end -}}
+	"{{.GetName}}";
 
 	// call
 	{{- if HasFullReply .}}

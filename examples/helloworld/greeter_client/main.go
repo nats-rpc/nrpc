@@ -21,7 +21,7 @@ func main() {
 	defer nc.Close()
 
 	// This is our generated client.
-	cli := helloworld.NewGreeterClient(nc, "en")
+	cli := helloworld.NewGreeterClient(nc, "en", "myid")
 
 	// Contact the server and print out its response.
 	resp, err := cli.SayHello(helloworld.HelloRequest{"world"})

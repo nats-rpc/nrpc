@@ -48,10 +48,12 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 
 func ParseSubject(
 	packageSubject string, packageParamsCount int,
-	serviceSubject string,
+	serviceSubject string, serviceParamsCount int,
 	subject string,
-) (packageParams []string, name string, encoding string, err error) {
-	subjectMinSize := packageParamsCount + 2
+) (packageParams []string, serviceParams []string,
+	name string, encoding string, err error,
+) {
+	subjectMinSize := packageParamsCount + serviceParamsCount + 2
 	if packageSubject != "" {
 		subjectMinSize++ // the optional package subject prefix
 	}
@@ -84,6 +86,9 @@ func ParseSubject(
 		return
 	}
 	tokens = tokens[1:]
+
+	serviceParams = tokens[0:serviceParamsCount]
+	tokens = tokens[serviceParamsCount:]
 
 	name = tokens[0]
 	tokens = tokens[1:]

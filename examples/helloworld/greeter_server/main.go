@@ -27,6 +27,8 @@ func (s *server) SayHello(ctx context.Context, req helloworld.HelloRequest) (res
 	} else {
 		resp.Message = "Hello " + req.Name
 	}
+	clientid := ctx.Value("nrpc-svc-clientid").(string)
+	log.Print("SayHello: clientid=", clientid)
 	return
 }
 

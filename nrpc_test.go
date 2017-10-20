@@ -279,6 +279,14 @@ func compareStringSlices(t *testing.T, expected, actual []string) {
 	if len(expected) != len(expected) {
 		t.Errorf("String slices are different. Expected [%s], got [%s]",
 			strings.Join(expected, ","), strings.Join(actual, ","))
+		return
+	}
+	for i, expectedValue := range expected {
+		if actual[i] != expectedValue {
+			t.Errorf("String slices are different. Expected [%s], got [%s]",
+				strings.Join(expected, ","), strings.Join(actual, ","))
+			return
+		}
 	}
 }
 
@@ -287,26 +295,32 @@ func TestParseSubject(t *testing.T) {
 		pkgSubject     string
 		pkgParamsCount int
 		svcSubject     string
+		svcParamsCount int
 		subject        string
 		pkgParams      []string
+		svcParams      []string
 		name           string
 		encoding       string
 		err            string
 	}{
-		{"", 0, "foo", "foo.bar", []string{}, "bar", "protobuf", ""},
-		{"", 0, "foo", "foo.bar.protobuf", []string{}, "bar", "protobuf", ""},
-		{"", 0, "foo", "foo.bar.json", []string{}, "bar", "json", ""},
-		{"", 0, "foo", "foo.bar.json.protobuf", []string{}, "", "",
+		{"", 0, "foo", 0, "foo.bar", nil, nil, "bar", "protobuf", ""},
+		{"", 0, "foo", 0, "foo.bar.protobuf", nil, nil, "bar", "protobuf", ""},
+		{"", 0, "foo", 0, "foo.bar.json", nil, nil, "bar", "json", ""},
+		{"", 0, "foo", 0, "foo.bar.json.protobuf", nil, nil, "", "",
 			"Invalid subject len. Expects number of parts between 2 and 3, got 4"},
-		{"demo", 0, "foo", "demo.foo.bar", []string{}, "bar", "protobuf", ""},
-		{"demo", 0, "foo", "demo.foo.bar.json", []string{}, "bar", "json", ""},
-		{"demo", 0, "foo", "foo.bar.json", []string{}, "", "",
+		{"demo", 0, "foo", 0, "demo.foo.bar", nil, nil, "bar", "protobuf", ""},
+		{"demo", 0, "foo", 0, "demo.foo.bar.json", nil, nil, "bar", "json", ""},
+		{"demo", 0, "foo", 0, "foo.bar.json", nil, nil, "", "",
 			"Invalid subject prefix. Expected 'demo', got 'foo'"},
-		{"demo", 2, "foo", "demo.p1.p2.foo.bar.json", []string{"p1", "p2"}, "bar", "json", ""},
+		{"demo", 2, "foo", 0, "demo.p1.p2.foo.bar.json", []string{"p1", "p2"}, nil, "bar", "json", ""},
+		{"demo", 2, "foo", 1, "demo.p1.p2.foo.sp1.bar.json", []string{"p1", "p2"}, []string{"sp1"}, "bar", "json", ""},
 	} {
-		pkgParams, name, encoding, err := nrpc.ParseSubject(
-			tt.pkgSubject, tt.pkgParamsCount, tt.svcSubject, tt.subject)
+		pkgParams, svcParams, name, encoding, err := nrpc.ParseSubject(
+			tt.pkgSubject, tt.pkgParamsCount,
+			tt.svcSubject, tt.svcParamsCount,
+			tt.subject)
 		compareStringSlices(t, tt.pkgParams, pkgParams)
+		compareStringSlices(t, tt.svcParams, svcParams)
 		if name != tt.name {
 			t.Errorf("test %d: Expected name=%s, got %s", i, tt.name, name)
 		}

@@ -88,8 +88,8 @@ func (h *GreeterHandler) Subject() string {
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
-	_, name, encoding, err := nrpc.ParseSubject(
-		"helloworld", 0, "Greeter", msg.Subject)
+	_, _, name, encoding, err := nrpc.ParseSubject(
+		"helloworld", 0, "Greeter", 0, msg.Subject)
 
 	ctx := h.ctx
 	// call handler and form response
@@ -166,10 +166,11 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 	}
 }
 
+
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 	start := time.Now()
 
-	subject := c.PkgSubject + "." + c.Subject + ".SayHello";
+	subject := c.PkgSubject + "." + c.Subject + "." + "SayHello";
 
 	// call
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)

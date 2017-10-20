@@ -228,6 +228,14 @@ var funcMap = template.FuncMap{
 		}
 		return sd.GetName()
 	},
+	"GetServiceSubjectParams": func(sd *descriptor.ServiceDescriptorProto) []string {
+		if opts := sd.GetOptions(); opts != nil {
+			if e, err := proto.GetExtension(opts, nrpc.E_ServiceSubjectParams); err == nil {
+				return e.([]string)
+			}
+		}
+		return []string{}
+	},
 	"Prometheus": func() bool {
 		return pluginPrometheus
 	},

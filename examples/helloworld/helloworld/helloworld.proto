@@ -30,6 +30,7 @@ option (nrpc.packageSubjectParams) = "language";
 // The greeting service definition.
 service Greeter {
   option (nrpc.serviceSubject) = "greeter";
+  option (nrpc.serviceSubjectParams) = "clientid"; // can be used for permissions
 
   // Sends a greeting
   rpc SayHello (HelloRequest) returns (HelloReply) {}

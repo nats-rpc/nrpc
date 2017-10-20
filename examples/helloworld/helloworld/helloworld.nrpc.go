@@ -36,16 +36,17 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "custom.*.greeter.>"
+	return "custom.*.greeter.*.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
-	pkgParams, name, encoding, err := nrpc.ParseSubject(
-		"custom", 1, "greeter", msg.Subject)
+	pkgParams, svcParams, name, encoding, err := nrpc.ParseSubject(
+		"custom", 1, "greeter", 1, msg.Subject)
 
 	ctx := h.ctx
 	ctx = context.WithValue(ctx, "nrpc-pkg-language", pkgParams[0])
+	ctx = context.WithValue(ctx, "nrpc-svc-clientid", svcParams[0])
 	// call handler and form response
 	var resp proto.Message
 	var replyError *nrpc.Error
@@ -141,24 +142,27 @@ type GreeterClient struct {
 	PkgSubject string
 	PkgParamlanguage string
 	Subject string
+	SvcParamclientid string
 	Encoding string
 	Timeout time.Duration
 }
 
-func NewGreeterClient(nc *nats.Conn, pkgParamlanguage string) *GreeterClient {
+func NewGreeterClient(nc *nats.Conn, pkgParamlanguage string, svcParamclientid string) *GreeterClient {
 	return &GreeterClient{
 		nc:      nc,
 		PkgSubject: "custom",
 		PkgParamlanguage: pkgParamlanguage,
 		Subject: "greeter",
+		SvcParamclientid: svcParamclientid,
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}
 }
 
+
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParamlanguage + "." + c.Subject + ".SayHello";
+	subject := c.PkgSubject + "." + c.PkgParamlanguage + "." + c.Subject + "." + c.SvcParamclientid + "." + "SayHello";
 
 	// call
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
@@ -171,7 +175,7 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 
 func (c *GreeterClient) SayHello2(req HelloRequest) (resp HelloReply, err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParamlanguage + "." + c.Subject + ".SayHello2";
+	subject := c.PkgSubject + "." + c.PkgParamlanguage + "." + c.Subject + "." + c.SvcParamclientid + "." + "SayHello2";
 
 	// call
 	var reply HelloFullReply1
@@ -186,7 +190,7 @@ func (c *GreeterClient) SayHello2(req HelloRequest) (resp HelloReply, err error)
 
 func (c *GreeterClient) SayHello3(req HelloRequest) (resp string, err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParamlanguage + "." + c.Subject + ".SayHello3";
+	subject := c.PkgSubject + "." + c.PkgParamlanguage + "." + c.Subject + "." + c.SvcParamclientid + "." + "SayHello3";
 
 	// call
 	var reply HelloFullReply2

@@ -16,6 +16,8 @@ extend google.protobuf.FileOptions {
 extend google.protobuf.ServiceOptions {
 	// A custom subject token to use instead of the service name
 	string serviceSubject = 50002;
+	// Parameters included in the subject at the service level
+	repeated string serviceSubjectParams = 50003;
 }
 
 message Error {
