@@ -36,12 +36,13 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "Greeter.>"
+	return "custom.Greeter.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
-	name, encoding, err := nrpc.ExtractFunctionNameAndEncoding(msg.Subject)
+	name, encoding, err := nrpc.ParseSubject(
+		"custom", "Greeter", msg.Subject)
 
 	// call handler and form response
 	var resp proto.Message
@@ -143,7 +144,7 @@ type GreeterClient struct {
 func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 	return &GreeterClient{
 		nc:      nc,
-		Subject: "Greeter",
+		Subject: "custom.Greeter",
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}

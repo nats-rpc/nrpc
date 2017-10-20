@@ -275,20 +275,26 @@ func TestUnmarshal(t *testing.T) {
 
 // MSG Greeter.SayHello-json 1 _INBOX.test 16\r\n{"foobar":"hello"}\r\n
 
-func TestExtractFunctionNameAndEncoding(t *testing.T) {
+func TestParseSubject(t *testing.T) {
 	for _, tt := range []struct {
-		subject  string
-		name     string
-		encoding string
-		err      string
+		pkgSubject string
+		svcSubject string
+		subject    string
+		name       string
+		encoding   string
+		err        string
 	}{
-		{"foo.bar", "bar", "protobuf", ""},
-		{"foo.bar.protobuf", "bar", "protobuf", ""},
-		{"foo.bar.json", "bar", "json", ""},
-		{"foo.bar.json.protobuf", "", "",
-			"Invalid subject. Expects 2 or 3 parts, got foo.bar.json.protobuf"},
+		{"", "foo", "foo.bar", "bar", "protobuf", ""},
+		{"", "foo", "foo.bar.protobuf", "bar", "protobuf", ""},
+		{"", "foo", "foo.bar.json", "bar", "json", ""},
+		{"", "foo", "foo.bar.json.protobuf", "bar", "",
+			"Invalid subject: got unparsable extra parts 'protobuf'"},
+		{"demo", "foo", "demo.foo.bar", "bar", "protobuf", ""},
+		{"demo", "foo", "demo.foo.bar.json", "bar", "json", ""},
+		{"demo", "foo", "foo.bar.json", "", "",
+			"Invalid subject prefix. Expected 'demo', got 'foo'"},
 	} {
-		name, encoding, err := nrpc.ExtractFunctionNameAndEncoding(tt.subject)
+		name, encoding, err := nrpc.ParseSubject(tt.pkgSubject, tt.svcSubject, tt.subject)
 		if name != tt.name {
 			t.Errorf("Expected name=%s, got %s", tt.name, name)
 		}
