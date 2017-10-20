@@ -46,10 +46,22 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 	}
 }
 
-func ParseSubject(packageSubject, serviceSubject, subject string) (name, encoding string, err error) {
+func ParseSubject(
+	packageSubject string, packageParamsCount int,
+	serviceSubject string,
+	subject string,
+) (packageParams []string, name string, encoding string, err error) {
+	subjectMinSize := packageParamsCount + 2
+	if packageSubject != "" {
+		subjectMinSize++ // the optional package subject prefix
+	}
+	subjectMaxSize := subjectMinSize + 1 // the optional encoding
+
 	tokens := strings.Split(subject, ".")
-	if len(tokens) == 0 {
-		err = fmt.Errorf("Empty subject")
+	if len(tokens) < subjectMinSize || len(tokens) > subjectMaxSize {
+		err = fmt.Errorf(
+			"Invalid subject len. Expects number of parts between %d and %d, got %d",
+			subjectMinSize, subjectMaxSize, len(tokens))
 		return
 	}
 	if packageSubject != "" {
@@ -61,10 +73,10 @@ func ParseSubject(packageSubject, serviceSubject, subject string) (name, encodin
 		}
 		tokens = tokens[1:]
 	}
-	if len(tokens) < 2 {
-		err = fmt.Errorf("Invalid subject: expected at least 2 more parts")
-		return
-	}
+
+	packageParams = tokens[0:packageParamsCount]
+	tokens = tokens[packageParamsCount:]
+
 	if tokens[0] != serviceSubject {
 		err = fmt.Errorf(
 			"Invalid subject. Service should be '%s', got '%s'",
@@ -82,9 +94,7 @@ func ParseSubject(packageSubject, serviceSubject, subject string) (name, encodin
 	case 1:
 		encoding = tokens[0]
 	default:
-		err = fmt.Errorf(
-			"Invalid subject: got unparsable extra parts '%s'",
-			strings.Join(tokens[1:], ","))
+		panic("Got extra tokens, which should be impossible at this point")
 	}
 	return
 }

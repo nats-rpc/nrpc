@@ -36,14 +36,16 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "custom.Greeter.>"
+	return "custom.*.Greeter.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
-	name, encoding, err := nrpc.ParseSubject(
-		"custom", "Greeter", msg.Subject)
+	pkgParams, name, encoding, err := nrpc.ParseSubject(
+		"custom", 1, "Greeter", msg.Subject)
 
+	ctx := h.ctx
+	ctx = context.WithValue(ctx, "nrpc-pkg-language", pkgParams[0])
 	// call handler and form response
 	var resp proto.Message
 	var replyError *nrpc.Error
@@ -59,7 +61,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 		} else {
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
-					innerResp, err := h.server.SayHello(h.ctx, req)
+					innerResp, err := h.server.SayHello(ctx, req)
 					if err != nil {
 						return nil, err
 					}
@@ -80,7 +82,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 		} else {
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
-					result, err := h.server.SayHello2(h.ctx, req)
+					result, err := h.server.SayHello2(ctx, req)
 					if err != nil {
 						return nil, err
 					}
@@ -105,7 +107,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 		} else {
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
-					result, err := h.server.SayHello3(h.ctx, req)
+					result, err := h.server.SayHello3(ctx, req)
 					if err != nil {
 						return nil, err
 					}
@@ -136,15 +138,19 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 
 type GreeterClient struct {
 	nc      *nats.Conn
+	PkgSubject string
+	PkgParamlanguage string
 	Subject string
 	Encoding string
 	Timeout time.Duration
 }
 
-func NewGreeterClient(nc *nats.Conn) *GreeterClient {
+func NewGreeterClient(nc *nats.Conn, pkgParamlanguage string) *GreeterClient {
 	return &GreeterClient{
 		nc:      nc,
-		Subject: "custom.Greeter",
+		PkgSubject: "custom",
+		PkgParamlanguage: pkgParamlanguage,
+		Subject: "Greeter",
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}
@@ -152,8 +158,10 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 
+	subject := c.PkgSubject + "." + c.PkgParamlanguage + "." + c.Subject + ".SayHello";
+
 	// call
-	err = nrpc.Call(&req, &resp, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
 	}
@@ -163,9 +171,11 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 
 func (c *GreeterClient) SayHello2(req HelloRequest) (resp HelloReply, err error) {
 
+	subject := c.PkgSubject + "." + c.PkgParamlanguage + "." + c.Subject + ".SayHello2";
+
 	// call
 	var reply HelloFullReply1
-	err = nrpc.Call(&req, &reply, c.nc, c.Subject+".SayHello2", c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &reply, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
 	}
@@ -176,9 +186,11 @@ func (c *GreeterClient) SayHello2(req HelloRequest) (resp HelloReply, err error)
 
 func (c *GreeterClient) SayHello3(req HelloRequest) (resp string, err error) {
 
+	subject := c.PkgSubject + "." + c.PkgParamlanguage + "." + c.Subject + ".SayHello3";
+
 	// call
 	var reply HelloFullReply2
-	err = nrpc.Call(&req, &reply, c.nc, c.Subject+".SayHello3", c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &reply, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
 	}

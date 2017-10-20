@@ -210,6 +210,14 @@ var funcMap = template.FuncMap{
 		return ""
 	},
 	"GetPkgSubject": pkgSubject,
+	"GetPkgSubjectParams": func(fd *descriptor.FileDescriptorProto) []string {
+		e, err := proto.GetExtension(fd.Options, nrpc.E_PackageSubjectParams)
+		if err == nil {
+			value := e.([]string)
+			return value
+		}
+		return nil
+	},
 	"Prometheus": func() bool {
 		return pluginPrometheus
 	},

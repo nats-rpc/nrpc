@@ -25,6 +25,7 @@ import "github.com/rapidloop/nrpc/nrpc.proto";
 package helloworld;
 
 option (nrpc.packageSubject) = "custom";
+option (nrpc.packageSubjectParams) = "language";
 
 // The greeting service definition.
 service Greeter {

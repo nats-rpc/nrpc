@@ -275,38 +275,50 @@ func TestUnmarshal(t *testing.T) {
 
 // MSG Greeter.SayHello-json 1 _INBOX.test 16\r\n{"foobar":"hello"}\r\n
 
+func compareStringSlices(t *testing.T, expected, actual []string) {
+	if len(expected) != len(expected) {
+		t.Errorf("String slices are different. Expected [%s], got [%s]",
+			strings.Join(expected, ","), strings.Join(actual, ","))
+	}
+}
+
 func TestParseSubject(t *testing.T) {
-	for _, tt := range []struct {
-		pkgSubject string
-		svcSubject string
-		subject    string
-		name       string
-		encoding   string
-		err        string
+	for i, tt := range []struct {
+		pkgSubject     string
+		pkgParamsCount int
+		svcSubject     string
+		subject        string
+		pkgParams      []string
+		name           string
+		encoding       string
+		err            string
 	}{
-		{"", "foo", "foo.bar", "bar", "protobuf", ""},
-		{"", "foo", "foo.bar.protobuf", "bar", "protobuf", ""},
-		{"", "foo", "foo.bar.json", "bar", "json", ""},
-		{"", "foo", "foo.bar.json.protobuf", "bar", "",
-			"Invalid subject: got unparsable extra parts 'protobuf'"},
-		{"demo", "foo", "demo.foo.bar", "bar", "protobuf", ""},
-		{"demo", "foo", "demo.foo.bar.json", "bar", "json", ""},
-		{"demo", "foo", "foo.bar.json", "", "",
+		{"", 0, "foo", "foo.bar", []string{}, "bar", "protobuf", ""},
+		{"", 0, "foo", "foo.bar.protobuf", []string{}, "bar", "protobuf", ""},
+		{"", 0, "foo", "foo.bar.json", []string{}, "bar", "json", ""},
+		{"", 0, "foo", "foo.bar.json.protobuf", []string{}, "", "",
+			"Invalid subject len. Expects number of parts between 2 and 3, got 4"},
+		{"demo", 0, "foo", "demo.foo.bar", []string{}, "bar", "protobuf", ""},
+		{"demo", 0, "foo", "demo.foo.bar.json", []string{}, "bar", "json", ""},
+		{"demo", 0, "foo", "foo.bar.json", []string{}, "", "",
 			"Invalid subject prefix. Expected 'demo', got 'foo'"},
+		{"demo", 2, "foo", "demo.p1.p2.foo.bar.json", []string{"p1", "p2"}, "bar", "json", ""},
 	} {
-		name, encoding, err := nrpc.ParseSubject(tt.pkgSubject, tt.svcSubject, tt.subject)
+		pkgParams, name, encoding, err := nrpc.ParseSubject(
+			tt.pkgSubject, tt.pkgParamsCount, tt.svcSubject, tt.subject)
+		compareStringSlices(t, tt.pkgParams, pkgParams)
 		if name != tt.name {
-			t.Errorf("Expected name=%s, got %s", tt.name, name)
+			t.Errorf("test %d: Expected name=%s, got %s", i, tt.name, name)
 		}
 		if encoding != tt.encoding {
-			t.Errorf("Expected encoding=%s, got %s", tt.encoding, encoding)
+			t.Errorf("text %d: Expected encoding=%s, got %s", i, tt.encoding, encoding)
 		}
 		if tt.err == "" && err != nil {
-			t.Errorf("Unexpected error %s", err)
+			t.Errorf("text %d: Unexpected error %s", i, err)
 		} else if tt.err != "" && err == nil {
-			t.Errorf("Expected error, got nothing")
+			t.Errorf("text %d: Expected error, got nothing", i)
 		} else if tt.err != "" && tt.err != err.Error() {
-			t.Errorf("Expected error '%s', got '%s'", tt.err, err)
+			t.Errorf("text %d: Expected error '%s', got '%s'", i, tt.err, err)
 		}
 	}
 }
