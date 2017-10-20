@@ -11,13 +11,13 @@ import (
 func TestHelloWorldExample(t *testing.T) {
 	// make sure protoc-gen-nrpc is up to date
 	installGenRPC := exec.Command("go", "install", "./protoc-gen-nrpc")
-	if err := installGenRPC.Run(); err != nil {
-		t.Fatal("Install protoc-gen-nrpc failed", err)
+	if out, err := installGenRPC.CombinedOutput(); err != nil {
+		t.Fatal("Install protoc-gen-nrpc failed", err, ":\n", string(out))
 	}
 	// generate the sources
 	generate := exec.Command("go", "generate", "./examples/helloworld/helloworld")
-	if err := generate.Run(); err != nil {
-		t.Fatal("Generate failed", err)
+	if out, err := generate.CombinedOutput(); err != nil {
+		t.Fatal("Generate failed", err, ":\n", string(out))
 	}
 	// build
 	buildServer := exec.Command("go", "build",
@@ -53,7 +53,7 @@ func TestHelloWorldExample(t *testing.T) {
 	out, err := client.CombinedOutput()
 	timeout.Stop()
 	if err != nil {
-		t.Fatal("Run client failed with:", err)
+		t.Fatal("Run client failed with:", err, ", output was:\n", string(out))
 	}
 	expectedOuput := "Greeting: Hello world\n"
 	if string(out) != expectedOuput {
