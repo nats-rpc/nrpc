@@ -1,5 +1,9 @@
 syntax = "proto3";
 
+package nrpc;
+
+option go_package = "github.com/rapidloop/nrpc";
+
 message RPCResponse {
 	string error = 1;
 	bytes response = 2;
