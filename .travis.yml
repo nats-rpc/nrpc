@@ -5,6 +5,8 @@ go:
 
 before_install:
   - curl -sSL https://github.com/google/protobuf/releases/download/v3.4.0/protoc-3.4.0-linux-x86_64.zip -o protoc.zip
-  - sudo unzip -d /usr protoc.zip bin/protoc
+  - sudo unzip -d /usr protoc.zip
   - sudo chmod a+x /usr/bin/protoc
+  - sudo mv /usr/include/google $GOPATH/src
+  - sudo chmod a+rx -R $GOPATH/src/google
   - go get -u github.com/golang/protobuf/protoc-gen-go
