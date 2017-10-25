@@ -1,8 +1,7 @@
 language: go
 
 go:
-  - 1.7
-  - 1.8
+  - 1.9
 
 before_install:
   - curl -sSL https://github.com/google/protobuf/releases/download/v3.4.0/protoc-3.4.0-linux-x86_64.zip -o protoc.zip
