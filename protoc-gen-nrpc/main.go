@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"github.com/golang/protobuf/protoc-gen-go/generator"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
 )
 
@@ -91,6 +92,93 @@ func goFileName(d *descriptor.FileDescriptorProto) string {
 	return name
 }
 
+func goType(td *descriptor.FieldDescriptorProto) string {
+	// Use protoc-gen-go generator to get the actual go type (for plain types
+	// only!)
+	t, _ := (*generator.Generator)(nil).GoType(nil, td)
+	// We assume proto3, but pass nil to the generator, which will assume proto2.
+	// The consequence is a leading star on the type that we need to trim
+	return strings.TrimPrefix(t, "*")
+}
+
+// splitMessageTypeName split a message type into (package name, type name)
+func splitMessageTypeName(name string) (string, string) {
+	if len(name) == 0 {
+		log.Fatal("Empty message type")
+	}
+	if name[0] != '.' {
+		log.Fatalf("Expect message type name to start with '.', but it is '%s'", name)
+	}
+	lastDot := strings.LastIndex(name, ".")
+	return name[1:lastDot], name[lastDot+1:]
+}
+
+func lookupFileDescriptor(name string) *descriptor.FileDescriptorProto {
+	for _, fd := range request.GetProtoFile() {
+		if fd.GetPackage() == name {
+			return fd
+		}
+	}
+	return nil
+}
+
+func lookupMessageType(name string) *descriptor.DescriptorProto {
+	pkgname, msgname := splitMessageTypeName(name)
+	fd := lookupFileDescriptor(pkgname)
+	if fd == nil {
+		log.Fatalf("Could not find the .proto file for package '%s'", pkgname)
+	}
+	for _, mt := range fd.GetMessageType() {
+		if mt.GetName() == msgname {
+			return mt
+		}
+	}
+	return nil
+}
+
+func getField(d *descriptor.DescriptorProto, name string) *descriptor.FieldDescriptorProto {
+	for _, f := range d.GetField() {
+		if f.GetName() == name {
+			return f
+		}
+	}
+	return nil
+}
+
+func getOneofDecl(d *descriptor.DescriptorProto, name string) *descriptor.OneofDescriptorProto {
+	for _, of := range d.GetOneofDecl() {
+		if of.GetName() == name {
+			return of
+		}
+	}
+	return nil
+}
+
+// matchReply checks if a message matches the 'reply' pattern. If so, it returns
+// the 'result' and 'error' fields.
+func matchReply(d *descriptor.DescriptorProto) (result *descriptor.FieldDescriptorProto, err *descriptor.FieldDescriptorProto) {
+	// Must have one and only one 'oneof', and its name must be 'reply'
+	if len(d.GetOneofDecl()) != 1 {
+		return
+	}
+
+	if d.GetOneofDecl()[0].GetName() != "reply" {
+		return
+	}
+	// All fields must be part of the "reply" oneof, and be either result or error
+	for _, field := range d.GetField() {
+		switch field.GetName() {
+		case "result":
+			result = field
+		case "error":
+			err = field
+		default:
+			return nil, nil
+		}
+	}
+	return
+}
+
 var pluginPrometheus bool
 
 var funcMap = template.FuncMap{
@@ -107,7 +195,40 @@ var funcMap = template.FuncMap{
 	"Prometheus": func() bool {
 		return pluginPrometheus
 	},
+	"HasFullReply": func(
+		md *descriptor.MethodDescriptorProto,
+	) bool {
+		d := lookupMessageType(md.GetOutputType())
+		resultField, _ := matchReply(d)
+		return resultField != nil
+	},
+	"GetResultType": func(
+		md *descriptor.MethodDescriptorProto,
+	) string {
+		d := lookupMessageType(md.GetOutputType())
+
+		resultField, _ := matchReply(d)
+
+		if resultField != nil {
+			if resultField.GetTypeName() == "" {
+				return goType(resultField)
+			}
+			return resultField.GetTypeName()
+		}
+		return md.GetOutputType()
+	},
+	"HasPointerResultType": func(
+		md *descriptor.MethodDescriptorProto,
+	) bool {
+		d := lookupMessageType(md.GetOutputType())
+
+		resultField, _ := matchReply(d)
+
+		return resultField.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE
+	},
 }
+
+var request plugin.CodeGeneratorRequest
 
 func main() {
 
@@ -117,7 +238,6 @@ func main() {
 		log.Fatalf("error: reading input: %v", err)
 	}
 
-	var request plugin.CodeGeneratorRequest
 	var response plugin.CodeGeneratorResponse
 	if err := proto.Unmarshal(data, &request); err != nil {
 		log.Fatalf("error: parsing input proto: %v", err)

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+import "nrpc.proto";
+
+message DummyMessage {
+    string foobar = 1;
+}
+
+message DummyReply {
+    oneof reply {
+        string foobar = 1;
+        nrpc.Error error = 2;
+    }
+}

@@ -92,42 +92,52 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 
 	// call handler and form response
 	var resp proto.Message
-	var errstr string
+	var replyError *nrpc.Error
 	var elapsed float64
 	switch name {
 	case "SayHello":
 		var req HelloRequest
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
-			errstr = "bad request received: " + err.Error()
+			replyError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
 			serverRequestsForGreeter.WithLabelValues(
 				"SayHello", encoding, "unmarshal_fail").Inc()
 		} else {
 			start := time.Now()
-			innerResp, err := h.server.SayHello(h.ctx, req)
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					innerResp, err := h.server.SayHello(h.ctx, req)
+					if err != nil {
+						return nil, err
+					}
+					return &innerResp, err
+				})
 			elapsed = time.Since(start).Seconds()
-			if err != nil {
-				log.Printf("SayHelloHandler: SayHello handler failed: %v", err)
-				errstr = err.Error()
+			if replyError != nil {
+				log.Printf("SayHelloHandler: SayHello handler failed: %s", replyError.Error())
 				serverRequestsForGreeter.WithLabelValues(
 					"SayHello", encoding, "handler_fail").Inc()
-			} else {
-				resp = &innerResp
 			}
 		}
 	default:
 		log.Printf("GreeterHandler: unknown name %q", name)
-		errstr = "unknown name: " + name
+		replyError = &nrpc.Error{
+			Type: nrpc.Error_CLIENT,
+			Message: "unknown name: " + name,
+		}
 		serverRequestsForGreeter.WithLabelValues(
 			"Greeter", encoding, "name_fail").Inc()
 	}
 
 	// encode and send response
-	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply, encoding) // error is logged
+	err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, encoding) // error is logged
 	if err != nil {
 		serverRequestsForGreeter.WithLabelValues(
 			name, encoding, "sendreply_fail").Inc()
-	} else if len(errstr) == 0 {
+	} else if replyError == nil {
 		serverRequestsForGreeter.WithLabelValues(
 			name, encoding, "success").Inc()
 	}
@@ -156,19 +166,11 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 	start := time.Now()
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &resp, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
 	if err != nil {
 		clientCallsForGreeter.WithLabelValues(
 			"SayHello", c.Encoding, "call_fail").Inc()
 		return // already logged
-	}
-
-	// decode inner reponse
-	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
-		log.Printf("SayHello: response unmarshal failed: %v", err)
-		clientCallsForGreeter.WithLabelValues(
-			"SayHello", c.Encoding, "unmarshal_fail").Inc()
-		return
 	}
 
 	// report total time taken to Prometheus

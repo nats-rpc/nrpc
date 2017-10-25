@@ -23,7 +23,8 @@ import (
 // {{.GetName}} should implement.
 type {{.GetName}}Server interface {
 	{{- range .Method}}
-	{{.GetName}}(ctx context.Context, req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName .GetOutputType}}, err error)
+	{{- $resultType := GetResultType .}}
+	{{.GetName}}(ctx context.Context, req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName $resultType}}, err error)
 	{{- end}}
 }
 
@@ -104,7 +105,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 
 	// call handler and form response
 	var resp proto.Message
-	var errstr string
+	var replyError *nrpc.Error
 {{- if Prometheus}}
 	var elapsed float64
 {{- end}}
@@ -114,7 +115,10 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		var req {{GetPkg $pkgName .GetInputType}}
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("{{.GetName}}Handler: {{.GetName}} request unmarshal failed: %v", err)
-			errstr = "bad request received: " + err.Error()
+			replyError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
 {{- if Prometheus}}
 			serverRequestsFor{{$serviceName}}.WithLabelValues(
 				"{{.GetName}}", encoding, "unmarshal_fail").Inc()
@@ -123,25 +127,47 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- if Prometheus}}
 			start := time.Now()
 {{- end}}
-			innerResp, err := h.server.{{.GetName}}(h.ctx, req)
+			{{- if HasFullReply . }}
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					result, err := h.server.{{.GetName}}(h.ctx, req)
+					if err != nil {
+						return nil, err
+					}
+					return &{{ GetPkg $pkgName .GetOutputType }}{
+						&{{ GetPkg $pkgName .GetOutputType }}_Result{
+							Result: {{if HasPointerResultType .}}&{{end}}result,
+						},
+					}, err
+				})
+			{{- else}}
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					innerResp, err := h.server.{{.GetName}}(h.ctx, req)
+					if err != nil {
+						return nil, err
+					}
+					return &innerResp, err
+				})
+			{{- end}}
 {{- if Prometheus}}
 			elapsed = time.Since(start).Seconds()
 {{- end}}
-			if err != nil {
-				log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed: %v", err)
-				errstr = err.Error()
+			if replyError != nil {
+				log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed: %s", replyError.Error())
 {{- if Prometheus}}
 				serverRequestsFor{{$serviceName}}.WithLabelValues(
 					"{{.GetName}}", encoding, "handler_fail").Inc()
 {{- end}}
-			} else {
-				resp = &innerResp
 			}
 		}
 {{- end}}
 	default:
 		log.Printf("{{.GetName}}Handler: unknown name %q", name)
-		errstr = "unknown name: " + name
+		replyError = &nrpc.Error{
+			Type: nrpc.Error_CLIENT,
+			Message: "unknown name: " + name,
+		}
 {{- if Prometheus}}
 		serverRequestsFor{{.GetName}}.WithLabelValues(
 			"{{.GetName}}", encoding, "name_fail").Inc()
@@ -149,12 +175,12 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	}
 
 	// encode and send response
-	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply, encoding) // error is logged
+	err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, encoding) // error is logged
 {{- if Prometheus}}
 	if err != nil {
 		serverRequestsFor{{$serviceName}}.WithLabelValues(
 			name, encoding, "sendreply_fail").Inc()
-	} else if len(errstr) == 0 {
+	} else if replyError == nil {
 		serverRequestsFor{{$serviceName}}.WithLabelValues(
 			name, encoding, "success").Inc()
 	}
@@ -185,13 +211,19 @@ func New{{.GetName}}Client(nc *nats.Conn) *{{.GetName}}Client {
 }
 {{$serviceName := .GetName}}
 {{- range .Method}}
-func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName .GetOutputType}}, err error) {
+{{- $resultType := GetResultType .}}
+func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName $resultType}}, err error) {
 {{- if Prometheus}}
 	start := time.Now()
 {{- end}}
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".{{.GetName}}", c.Encoding, c.Timeout)
+	{{- if HasFullReply .}}
+	var reply {{GetPkg $pkgName .GetOutputType}}
+	err = nrpc.Call(&req, &reply, c.nc, c.Subject+".{{.GetName}}", c.Encoding, c.Timeout)
+	{{- else}}
+	err = nrpc.Call(&req, &resp, c.nc, c.Subject+".{{.GetName}}", c.Encoding, c.Timeout)
+	{{- end}}
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(
@@ -200,15 +232,9 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 		return // already logged
 	}
 
-	// decode inner reponse
-	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
-		log.Printf("{{.GetName}}: response unmarshal failed: %v", err)
-{{- if Prometheus}}
-		clientCallsFor{{$serviceName}}.WithLabelValues(
-			"{{.GetName}}", c.Encoding, "unmarshal_fail").Inc()
-{{- end}}
-		return
-	}
+	{{- if HasFullReply .}}
+	resp = {{if HasPointerResultType .}}*{{end}}reply.GetResult()
+	{{- end}}
 
 {{- if Prometheus}}
 

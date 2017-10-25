@@ -15,6 +15,8 @@ import (
 // Greeter should implement.
 type GreeterServer interface {
 	SayHello(ctx context.Context, req HelloRequest) (resp HelloReply, err error)
+	SayHello2(ctx context.Context, req HelloRequest) (resp HelloReply, err error)
+	SayHello3(ctx context.Context, req HelloRequest) (resp string, err error)
 }
 
 // GreeterHandler provides a NATS subscription handler that can serve a
@@ -43,29 +45,89 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 
 	// call handler and form response
 	var resp proto.Message
-	var errstr string
+	var replyError *nrpc.Error
 	switch name {
 	case "SayHello":
 		var req HelloRequest
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
-			errstr = "bad request received: " + err.Error()
+			replyError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
 		} else {
-			innerResp, err := h.server.SayHello(h.ctx, req)
-			if err != nil {
-				log.Printf("SayHelloHandler: SayHello handler failed: %v", err)
-				errstr = err.Error()
-			} else {
-				resp = &innerResp
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					innerResp, err := h.server.SayHello(h.ctx, req)
+					if err != nil {
+						return nil, err
+					}
+					return &innerResp, err
+				})
+			if replyError != nil {
+				log.Printf("SayHelloHandler: SayHello handler failed: %s", replyError.Error())
+			}
+		}
+	case "SayHello2":
+		var req HelloRequest
+		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
+			log.Printf("SayHello2Handler: SayHello2 request unmarshal failed: %v", err)
+			replyError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
+		} else {
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					result, err := h.server.SayHello2(h.ctx, req)
+					if err != nil {
+						return nil, err
+					}
+					return &HelloFullReply1{
+						&HelloFullReply1_Result{
+							Result: &result,
+						},
+					}, err
+				})
+			if replyError != nil {
+				log.Printf("SayHello2Handler: SayHello2 handler failed: %s", replyError.Error())
+			}
+		}
+	case "SayHello3":
+		var req HelloRequest
+		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
+			log.Printf("SayHello3Handler: SayHello3 request unmarshal failed: %v", err)
+			replyError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
+		} else {
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					result, err := h.server.SayHello3(h.ctx, req)
+					if err != nil {
+						return nil, err
+					}
+					return &HelloFullReply2{
+						&HelloFullReply2_Result{
+							Result: result,
+						},
+					}, err
+				})
+			if replyError != nil {
+				log.Printf("SayHello3Handler: SayHello3 handler failed: %s", replyError.Error())
 			}
 		}
 	default:
 		log.Printf("GreeterHandler: unknown name %q", name)
-		errstr = "unknown name: " + name
+		replyError = &nrpc.Error{
+			Type: nrpc.Error_CLIENT,
+			Message: "unknown name: " + name,
+		}
 	}
 
 	// encode and send response
-	err = nrpc.Publish(resp, errstr, h.nc, msg.Reply, encoding) // error is logged
+	err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, encoding) // error is logged
 	if err != nil {
 		log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
 	}
@@ -90,16 +152,36 @@ func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 
 	// call
-	respBytes, err := nrpc.Call(&req, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &resp, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
 	}
 
-	// decode inner reponse
-	if err = nrpc.Unmarshal(c.Encoding, respBytes, &resp); err != nil {
-		log.Printf("SayHello: response unmarshal failed: %v", err)
-		return
+	return
+}
+
+func (c *GreeterClient) SayHello2(req HelloRequest) (resp HelloReply, err error) {
+
+	// call
+	var reply HelloFullReply1
+	err = nrpc.Call(&req, &reply, c.nc, c.Subject+".SayHello2", c.Encoding, c.Timeout)
+	if err != nil {
+		return // already logged
 	}
+	resp = *reply.GetResult()
+
+	return
+}
+
+func (c *GreeterClient) SayHello3(req HelloRequest) (resp string, err error) {
+
+	// call
+	var reply HelloFullReply2
+	err = nrpc.Call(&req, &reply, c.nc, c.Subject+".SayHello3", c.Encoding, c.Timeout)
+	if err != nil {
+		return // already logged
+	}
+	resp = reply.GetResult()
 
 	return
 }
