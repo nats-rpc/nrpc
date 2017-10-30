@@ -226,6 +226,17 @@ var funcMap = template.FuncMap{
 				return *value
 			}
 		}
+		if opts := currentFile.GetOptions(); opts != nil {
+			s, err := proto.GetExtension(opts, nrpc.E_ServiceSubjectRule)
+			if err == nil {
+				switch *(s.(*nrpc.SubjectRule)) {
+				case nrpc.SubjectRule_COPY:
+					return sd.GetName()
+				case nrpc.SubjectRule_TOLOWER:
+					return strings.ToLower(sd.GetName())
+				}
+			}
+		}
 		return sd.GetName()
 	},
 	"GetServiceSubjectParams": func(sd *descriptor.ServiceDescriptorProto) []string {
@@ -273,6 +284,7 @@ var funcMap = template.FuncMap{
 }
 
 var request plugin.CodeGeneratorRequest
+var currentFile *descriptor.FileDescriptorProto
 
 func main() {
 
@@ -308,6 +320,8 @@ func main() {
 		if fd == nil {
 			log.Fatalf("could not find the .proto file for %s", name)
 		}
+
+		currentFile = fd
 
 		var buf bytes.Buffer
 		if err := tmpl.Execute(&buf, fd); err != nil {

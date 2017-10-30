@@ -48,7 +48,7 @@ func TestBasicCalls(t *testing.T) {
 	if handler1.Subject() != "root.*.custom_subject.>" {
 		t.Fatal("Invalid subject", handler1.Subject())
 	}
-	if handler2.Subject() != "root.*.SvcSubjectParams.*.>" {
+	if handler2.Subject() != "root.*.svcsubjectparams.*.>" {
 		t.Fatal("Invalid subject", handler2.Subject())
 	}
 

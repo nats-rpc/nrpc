@@ -7,6 +7,8 @@ import "github.com/rapidloop/nrpc/nrpc.proto";
 option (nrpc.packageSubject) = "root";
 option (nrpc.packageSubjectParams) = "instance";
 
+option (nrpc.serviceSubjectRule) = TOLOWER;
+
 service SvcCustomSubject {
     option (nrpc.serviceSubject) = 'custom_subject';
 

@@ -181,13 +181,13 @@ func NewSvcSubjectParamsHandler(ctx context.Context, nc *nats.Conn, s SvcSubject
 }
 
 func (h *SvcSubjectParamsHandler) Subject() string {
-	return "root.*.SvcSubjectParams.*.>"
+	return "root.*.svcsubjectparams.*.>"
 }
 
 func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
 	pkgParams, svcParams, name, encoding, err := nrpc.ParseSubject(
-		"root", 1, "SvcSubjectParams", 1, msg.Subject)
+		"root", 1, "svcsubjectparams", 1, msg.Subject)
 
 	ctx := h.ctx
 	ctx = context.WithValue(ctx, "nrpc-pkg-instance", pkgParams[0])
@@ -251,7 +251,7 @@ func NewSvcSubjectParamsClient(nc *nats.Conn, pkgParaminstance string, svcParamc
 		nc:      nc,
 		PkgSubject: "root",
 		PkgParaminstance: pkgParaminstance,
-		Subject: "SvcSubjectParams",
+		Subject: "svcsubjectparams",
 		SvcParamclientid: svcParamclientid,
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
