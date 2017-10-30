@@ -47,6 +47,9 @@ func TestHelloWorldExample(t *testing.T) {
 		}
 	}()
 
+	// Give the server a little time to be ready to handle requests
+	time.Sleep(250 * time.Millisecond)
+
 	// run the client and check its output
 	client := exec.Command("./examples/helloworld/greeter_client/greeter_client")
 	timeout := time.AfterFunc(time.Second, func() { client.Process.Kill() })
