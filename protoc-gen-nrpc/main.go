@@ -239,6 +239,27 @@ var funcMap = template.FuncMap{
 		}
 		return sd.GetName()
 	},
+	"GetMethodSubject": func(md *descriptor.MethodDescriptorProto) string {
+		if opts := md.GetOptions(); opts != nil {
+			s, err := proto.GetExtension(opts, nrpc.E_MethodSubject)
+			if err == nil {
+				value := s.(*string)
+				return *value
+			}
+		}
+		if opts := currentFile.GetOptions(); opts != nil {
+			s, err := proto.GetExtension(opts, nrpc.E_MethodSubjectRule)
+			if err == nil {
+				switch *(s.(*nrpc.SubjectRule)) {
+				case nrpc.SubjectRule_COPY:
+					return md.GetName()
+				case nrpc.SubjectRule_TOLOWER:
+					return strings.ToLower(md.GetName())
+				}
+			}
+		}
+		return md.GetName()
+	},
 	"GetServiceSubjectParams": func(sd *descriptor.ServiceDescriptorProto) []string {
 		if opts := sd.GetOptions(); opts != nil {
 			if e, err := proto.GetExtension(opts, nrpc.E_ServiceSubjectParams); err == nil {
