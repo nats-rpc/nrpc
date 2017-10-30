@@ -4,6 +4,22 @@ package nrpc;
 
 option go_package = "github.com/rapidloop/nrpc";
 
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FileOptions {
+    // A custom subject prefix to use instead of the package name
+    string packageSubject = 50000;
+    // Parameters included in the subject at the package level
+    repeated string packageSubjectParams = 50001;
+}
+
+extend google.protobuf.ServiceOptions {
+	// A custom subject token to use instead of the service name
+	string serviceSubject = 50002;
+	// Parameters included in the subject at the service level
+	repeated string serviceSubjectParams = 50003;
+}
+
 message Error {
     enum Type {
         CLIENT = 0;

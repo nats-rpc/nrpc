@@ -275,32 +275,64 @@ func TestUnmarshal(t *testing.T) {
 
 // MSG Greeter.SayHello-json 1 _INBOX.test 16\r\n{"foobar":"hello"}\r\n
 
-func TestExtractFunctionNameAndEncoding(t *testing.T) {
-	for _, tt := range []struct {
-		subject  string
-		name     string
-		encoding string
-		err      string
+func compareStringSlices(t *testing.T, expected, actual []string) {
+	if len(expected) != len(expected) {
+		t.Errorf("String slices are different. Expected [%s], got [%s]",
+			strings.Join(expected, ","), strings.Join(actual, ","))
+		return
+	}
+	for i, expectedValue := range expected {
+		if actual[i] != expectedValue {
+			t.Errorf("String slices are different. Expected [%s], got [%s]",
+				strings.Join(expected, ","), strings.Join(actual, ","))
+			return
+		}
+	}
+}
+
+func TestParseSubject(t *testing.T) {
+	for i, tt := range []struct {
+		pkgSubject     string
+		pkgParamsCount int
+		svcSubject     string
+		svcParamsCount int
+		subject        string
+		pkgParams      []string
+		svcParams      []string
+		name           string
+		encoding       string
+		err            string
 	}{
-		{"foo.bar", "bar", "protobuf", ""},
-		{"foo.bar.protobuf", "bar", "protobuf", ""},
-		{"foo.bar.json", "bar", "json", ""},
-		{"foo.bar.json.protobuf", "", "",
-			"Invalid subject. Expects 2 or 3 parts, got foo.bar.json.protobuf"},
+		{"", 0, "foo", 0, "foo.bar", nil, nil, "bar", "protobuf", ""},
+		{"", 0, "foo", 0, "foo.bar.protobuf", nil, nil, "bar", "protobuf", ""},
+		{"", 0, "foo", 0, "foo.bar.json", nil, nil, "bar", "json", ""},
+		{"", 0, "foo", 0, "foo.bar.json.protobuf", nil, nil, "", "",
+			"Invalid subject len. Expects number of parts between 2 and 3, got 4"},
+		{"demo", 0, "foo", 0, "demo.foo.bar", nil, nil, "bar", "protobuf", ""},
+		{"demo", 0, "foo", 0, "demo.foo.bar.json", nil, nil, "bar", "json", ""},
+		{"demo", 0, "foo", 0, "foo.bar.json", nil, nil, "", "",
+			"Invalid subject prefix. Expected 'demo', got 'foo'"},
+		{"demo", 2, "foo", 0, "demo.p1.p2.foo.bar.json", []string{"p1", "p2"}, nil, "bar", "json", ""},
+		{"demo", 2, "foo", 1, "demo.p1.p2.foo.sp1.bar.json", []string{"p1", "p2"}, []string{"sp1"}, "bar", "json", ""},
 	} {
-		name, encoding, err := nrpc.ExtractFunctionNameAndEncoding(tt.subject)
+		pkgParams, svcParams, name, encoding, err := nrpc.ParseSubject(
+			tt.pkgSubject, tt.pkgParamsCount,
+			tt.svcSubject, tt.svcParamsCount,
+			tt.subject)
+		compareStringSlices(t, tt.pkgParams, pkgParams)
+		compareStringSlices(t, tt.svcParams, svcParams)
 		if name != tt.name {
-			t.Errorf("Expected name=%s, got %s", tt.name, name)
+			t.Errorf("test %d: Expected name=%s, got %s", i, tt.name, name)
 		}
 		if encoding != tt.encoding {
-			t.Errorf("Expected encoding=%s, got %s", tt.encoding, encoding)
+			t.Errorf("text %d: Expected encoding=%s, got %s", i, tt.encoding, encoding)
 		}
 		if tt.err == "" && err != nil {
-			t.Errorf("Unexpected error %s", err)
+			t.Errorf("text %d: Unexpected error %s", i, err)
 		} else if tt.err != "" && err == nil {
-			t.Errorf("Expected error, got nothing")
+			t.Errorf("text %d: Expected error, got nothing", i)
 		} else if tt.err != "" && tt.err != err.Error() {
-			t.Errorf("Expected error '%s', got '%s'", tt.err, err)
+			t.Errorf("text %d: Expected error '%s', got '%s'", i, tt.err, err)
 		}
 	}
 }

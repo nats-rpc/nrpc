@@ -24,8 +24,14 @@ import "github.com/rapidloop/nrpc/nrpc.proto";
 
 package helloworld;
 
+option (nrpc.packageSubject) = "custom";
+option (nrpc.packageSubjectParams) = "language";
+
 // The greeting service definition.
 service Greeter {
+  option (nrpc.serviceSubject) = "greeter";
+  option (nrpc.serviceSubjectParams) = "clientid"; // can be used for permissions
+
   // Sends a greeting
   rpc SayHello (HelloRequest) returns (HelloReply) {}
   rpc SayHello2 (HelloRequest) returns (HelloFullReply1) {}

@@ -46,23 +46,61 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 	}
 }
 
-// ExtractFunctionNameAndEncoding parses a subject and extract the function
-// name and the encoding (defaults to "protobuf").
-// The subject structure is: "[package.]service.function[-encoding]"
-func ExtractFunctionNameAndEncoding(subject string) (name string, encoding string, err error) {
-	dotSplitted := strings.Split(subject, ".")
-	if len(dotSplitted) == 2 {
-		name = dotSplitted[1]
-		encoding = "protobuf"
-	} else if len(dotSplitted) == 3 {
-		name = dotSplitted[1]
-		encoding = dotSplitted[2]
-	} else {
-		err = errors.New(
-			"Invalid subject. Expects 2 or 3 parts, got " + subject,
-		)
+func ParseSubject(
+	packageSubject string, packageParamsCount int,
+	serviceSubject string, serviceParamsCount int,
+	subject string,
+) (packageParams []string, serviceParams []string,
+	name string, encoding string, err error,
+) {
+	subjectMinSize := packageParamsCount + serviceParamsCount + 2
+	if packageSubject != "" {
+		subjectMinSize++ // the optional package subject prefix
+	}
+	subjectMaxSize := subjectMinSize + 1 // the optional encoding
+
+	tokens := strings.Split(subject, ".")
+	if len(tokens) < subjectMinSize || len(tokens) > subjectMaxSize {
+		err = fmt.Errorf(
+			"Invalid subject len. Expects number of parts between %d and %d, got %d",
+			subjectMinSize, subjectMaxSize, len(tokens))
+		return
+	}
+	if packageSubject != "" {
+		if tokens[0] != packageSubject {
+			err = fmt.Errorf(
+				"Invalid subject prefix. Expected '%s', got '%s'",
+				packageSubject, tokens[0])
+			return
+		}
+		tokens = tokens[1:]
 	}
 
+	packageParams = tokens[0:packageParamsCount]
+	tokens = tokens[packageParamsCount:]
+
+	if tokens[0] != serviceSubject {
+		err = fmt.Errorf(
+			"Invalid subject. Service should be '%s', got '%s'",
+			serviceSubject, tokens[0])
+		return
+	}
+	tokens = tokens[1:]
+
+	serviceParams = tokens[0:serviceParamsCount]
+	tokens = tokens[serviceParamsCount:]
+
+	name = tokens[0]
+	tokens = tokens[1:]
+
+	switch len(tokens) {
+	case 0:
+		encoding = "protobuf"
+	case 1:
+		encoding = tokens[0]
+	default:
+		panic("Got extra tokens, which should be impossible at this point")
+	}
 	return
 }
 

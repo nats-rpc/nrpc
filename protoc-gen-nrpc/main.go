@@ -9,6 +9,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/rapidloop/nrpc"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/protoc-gen-go/generator"
@@ -179,6 +181,15 @@ func matchReply(d *descriptor.DescriptorProto) (result *descriptor.FieldDescript
 	return
 }
 
+func pkgSubject(fd *descriptor.FileDescriptorProto) string {
+	e, err := proto.GetExtension(fd.Options, nrpc.E_PackageSubject)
+	if err == nil {
+		value := e.(*string)
+		return *value
+	}
+	return fd.GetPackage()
+}
+
 var pluginPrometheus bool
 
 var funcMap = template.FuncMap{
@@ -191,6 +202,39 @@ var funcMap = template.FuncMap{
 		s = strings.TrimPrefix(s, pkg)
 		s = strings.TrimPrefix(s, ".")
 		return s
+	},
+	"GetPkgSubjectPrefix": func(fd *descriptor.FileDescriptorProto) string {
+		if s := pkgSubject(fd); s != "" {
+			return s + "."
+		}
+		return ""
+	},
+	"GetPkgSubject": pkgSubject,
+	"GetPkgSubjectParams": func(fd *descriptor.FileDescriptorProto) []string {
+		e, err := proto.GetExtension(fd.Options, nrpc.E_PackageSubjectParams)
+		if err == nil {
+			value := e.([]string)
+			return value
+		}
+		return nil
+	},
+	"GetServiceSubject": func(sd *descriptor.ServiceDescriptorProto) string {
+		if opts := sd.GetOptions(); opts != nil {
+			s, err := proto.GetExtension(opts, nrpc.E_ServiceSubject)
+			if err == nil {
+				value := s.(*string)
+				return *value
+			}
+		}
+		return sd.GetName()
+	},
+	"GetServiceSubjectParams": func(sd *descriptor.ServiceDescriptorProto) []string {
+		if opts := sd.GetOptions(); opts != nil {
+			if e, err := proto.GetExtension(opts, nrpc.E_ServiceSubjectParams); err == nil {
+				return e.([]string)
+			}
+		}
+		return []string{}
 	},
 	"Prometheus": func() bool {
 		return pluginPrometheus

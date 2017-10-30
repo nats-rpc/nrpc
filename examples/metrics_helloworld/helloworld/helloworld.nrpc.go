@@ -83,13 +83,15 @@ func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *Gre
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "Greeter.>"
+	return "helloworld.Greeter.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
-	name, encoding, err := nrpc.ExtractFunctionNameAndEncoding(msg.Subject)
+	_, _, name, encoding, err := nrpc.ParseSubject(
+		"helloworld", 0, "Greeter", 0, msg.Subject)
 
+	ctx := h.ctx
 	// call handler and form response
 	var resp proto.Message
 	var replyError *nrpc.Error
@@ -109,7 +111,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 			start := time.Now()
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
-					innerResp, err := h.server.SayHello(h.ctx, req)
+					innerResp, err := h.server.SayHello(ctx, req)
 					if err != nil {
 						return nil, err
 					}
@@ -148,6 +150,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 
 type GreeterClient struct {
 	nc      *nats.Conn
+	PkgSubject string
 	Subject string
 	Encoding string
 	Timeout time.Duration
@@ -156,17 +159,21 @@ type GreeterClient struct {
 func NewGreeterClient(nc *nats.Conn) *GreeterClient {
 	return &GreeterClient{
 		nc:      nc,
+		PkgSubject: "helloworld",
 		Subject: "Greeter",
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
 	}
 }
 
+
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 	start := time.Now()
 
+	subject := c.PkgSubject + "." + c.Subject + "." + "SayHello";
+
 	// call
-	err = nrpc.Call(&req, &resp, c.nc, c.Subject+".SayHello", c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		clientCallsForGreeter.WithLabelValues(
 			"SayHello", c.Encoding, "call_fail").Inc()
