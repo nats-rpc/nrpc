@@ -314,6 +314,8 @@ func TestParseSubject(t *testing.T) {
 			"Invalid subject prefix. Expected 'demo', got 'foo'"},
 		{"demo", 2, "foo", 0, "demo.p1.p2.foo.bar.json", []string{"p1", "p2"}, nil, "bar", "json", ""},
 		{"demo", 2, "foo", 1, "demo.p1.p2.foo.sp1.bar.json", []string{"p1", "p2"}, []string{"sp1"}, "bar", "json", ""},
+		{"demo.pkg", 1, "nested.svc", 1, "demo.pkg.p1.nested.svc.sp1.bar",
+			[]string{"p1"}, []string{"sp1"}, "bar", "protobuf", ""},
 	} {
 		pkgParams, svcParams, name, encoding, err := nrpc.ParseSubject(
 			tt.pkgSubject, tt.pkgParamsCount,
