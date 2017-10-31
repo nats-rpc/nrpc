@@ -94,7 +94,7 @@ func goFileName(d *descriptor.FileDescriptorProto) string {
 	return name
 }
 
-func goType(td *descriptor.FieldDescriptorProto) string {
+func fieldGoType(td *descriptor.FieldDescriptorProto) string {
 	// Use protoc-gen-go generator to get the actual go type (for plain types
 	// only!)
 	t, _ := (*generator.Generator)(nil).GoType(nil, td)
@@ -287,7 +287,7 @@ var funcMap = template.FuncMap{
 
 		if resultField != nil {
 			if resultField.GetTypeName() == "" {
-				return goType(resultField)
+				return fieldGoType(resultField)
 			}
 			return resultField.GetTypeName()
 		}
