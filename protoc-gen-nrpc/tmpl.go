@@ -448,9 +448,89 @@ func (c *{{$serviceName}}Client) {{.GetName}}SubscribeChan(
 	return ch, sub, err
 }
 
-{{end}}
+{{end -}}
 {{- end}}
-{{- end -}}
+{{- end}}
+type Client struct {
+	nc      nrpc.NatsConn
+	defaultEncoding string
+	defaultTimeout time.Duration
+	{{- if ne 0 (len $pkgSubject)}}
+	pkgSubject string
+	{{- end}}
+	{{- range $pkgSubjectParams}}
+	pkgParam{{ . }} string
+	{{- end}}
+
+	{{- range .Service}}
+	{{.GetName}} *{{.GetName}}Client
+	{{- end}}
+}
+
+func NewClient(nc nrpc.NatsConn
+	{{- range $pkgSubjectParams -}}
+	, pkgParam{{.}} string
+	{{- end -}}) *Client {
+	c := Client{
+		nc: nc,
+		defaultEncoding: "protobuf",
+		defaultTimeout: 5*time.Second,
+		pkgSubject: "{{$pkgSubject}}",
+		{{- range $pkgSubjectParams}}
+		pkgParam{{.}}: pkgParam{{.}},
+		{{- end}}
+	};
+	{{- range .Service}}
+	{{- if eq 0 (len (GetServiceSubjectParams .))}}
+	c.{{.GetName}} = New{{.GetName}}Client(nc
+	{{- range $pkgSubjectParams -}}
+		, c.pkgParam{{ . }}
+	{{- end}})
+	{{- end}}
+	{{- end}}
+	return &c
+}
+
+func (c *Client) SetEncoding(encoding string) {
+	c.defaultEncoding = encoding
+	{{- range .Service}}
+	if c.{{.GetName}} != nil {
+		c.{{.GetName}}.Encoding = encoding
+	}
+	{{- end}}
+}
+
+func (c *Client) SetTimeout(t time.Duration) {
+	c.defaultTimeout = t
+	{{- range .Service}}
+	if c.{{.GetName}} != nil {
+		c.{{.GetName}}.Timeout = t
+	}
+	{{- end}}
+}
+
+{{- range .Service}}
+{{- if ne 0 (len (GetServiceSubjectParams .))}}
+
+func (c *Client) Set{{.GetName}}Params(
+	{{- range GetServiceSubjectParams .}}
+	{{ . }} string,
+	{{- end}}
+) {
+	c.{{.GetName}} = New{{.GetName}}Client(
+		c.nc,
+	{{- range $pkgSubjectParams}}
+		c.pkgParam{{ . }},
+	{{- end}}
+	{{- range GetServiceSubjectParams .}}
+		{{ . }},
+	{{- end}}
+	)
+	c.{{.GetName}}.Encoding = c.defaultEncoding
+	c.{{.GetName}}.Timeout = c.defaultTimeout
+}
+{{- end}}
+{{- end}}
 
 {{- if Prometheus}}
 
