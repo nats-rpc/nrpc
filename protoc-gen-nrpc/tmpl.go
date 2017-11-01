@@ -86,11 +86,11 @@ var (
 // subscription using a given {{.GetName}}Server implementation.
 type {{.GetName}}Handler struct {
 	ctx    context.Context
-	nc     *nats.Conn
+	nc     nrpc.NatsConn
 	server {{.GetName}}Server
 }
 
-func New{{.GetName}}Handler(ctx context.Context, nc *nats.Conn, s {{.GetName}}Server) *{{.GetName}}Handler {
+func New{{.GetName}}Handler(ctx context.Context, nc nrpc.NatsConn, s {{.GetName}}Server) *{{.GetName}}Handler {
 	return &{{.GetName}}Handler{
 		ctx:    ctx,
 		nc:     nc,
@@ -216,7 +216,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 }
 
 type {{.GetName}}Client struct {
-	nc      *nats.Conn
+	nc      nrpc.NatsConn
 	{{- if ne 0 (len $pkgSubject)}}
 	PkgSubject string
 	{{- end}}
@@ -231,7 +231,7 @@ type {{.GetName}}Client struct {
 	Timeout time.Duration
 }
 
-func New{{.GetName}}Client(nc *nats.Conn
+func New{{.GetName}}Client(nc nrpc.NatsConn
 	{{- range $pkgSubjectParams -}}
 	, pkgParam{{.}} string
 	{{- end -}}

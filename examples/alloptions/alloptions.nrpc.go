@@ -22,11 +22,11 @@ type SvcCustomSubjectServer interface {
 // subscription using a given SvcCustomSubjectServer implementation.
 type SvcCustomSubjectHandler struct {
 	ctx    context.Context
-	nc     *nats.Conn
+	nc     nrpc.NatsConn
 	server SvcCustomSubjectServer
 }
 
-func NewSvcCustomSubjectHandler(ctx context.Context, nc *nats.Conn, s SvcCustomSubjectServer) *SvcCustomSubjectHandler {
+func NewSvcCustomSubjectHandler(ctx context.Context, nc nrpc.NatsConn, s SvcCustomSubjectServer) *SvcCustomSubjectHandler {
 	return &SvcCustomSubjectHandler{
 		ctx:    ctx,
 		nc:     nc,
@@ -111,7 +111,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 }
 
 type SvcCustomSubjectClient struct {
-	nc      *nats.Conn
+	nc      nrpc.NatsConn
 	PkgSubject string
 	PkgParaminstance string
 	Subject string
@@ -119,7 +119,7 @@ type SvcCustomSubjectClient struct {
 	Timeout time.Duration
 }
 
-func NewSvcCustomSubjectClient(nc *nats.Conn, pkgParaminstance string) *SvcCustomSubjectClient {
+func NewSvcCustomSubjectClient(nc nrpc.NatsConn, pkgParaminstance string) *SvcCustomSubjectClient {
 	return &SvcCustomSubjectClient{
 		nc:      nc,
 		PkgSubject: "root",
@@ -168,11 +168,11 @@ type SvcSubjectParamsServer interface {
 // subscription using a given SvcSubjectParamsServer implementation.
 type SvcSubjectParamsHandler struct {
 	ctx    context.Context
-	nc     *nats.Conn
+	nc     nrpc.NatsConn
 	server SvcSubjectParamsServer
 }
 
-func NewSvcSubjectParamsHandler(ctx context.Context, nc *nats.Conn, s SvcSubjectParamsServer) *SvcSubjectParamsHandler {
+func NewSvcSubjectParamsHandler(ctx context.Context, nc nrpc.NatsConn, s SvcSubjectParamsServer) *SvcSubjectParamsHandler {
 	return &SvcSubjectParamsHandler{
 		ctx:    ctx,
 		nc:     nc,
@@ -237,7 +237,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 }
 
 type SvcSubjectParamsClient struct {
-	nc      *nats.Conn
+	nc      nrpc.NatsConn
 	PkgSubject string
 	PkgParaminstance string
 	Subject string
@@ -246,7 +246,7 @@ type SvcSubjectParamsClient struct {
 	Timeout time.Duration
 }
 
-func NewSvcSubjectParamsClient(nc *nats.Conn, pkgParaminstance string, svcParamclientid string) *SvcSubjectParamsClient {
+func NewSvcSubjectParamsClient(nc nrpc.NatsConn, pkgParaminstance string, svcParamclientid string) *SvcSubjectParamsClient {
 	return &SvcSubjectParamsClient{
 		nc:      nc,
 		PkgSubject: "root",
