@@ -529,6 +529,25 @@ func (c *Client) Set{{.GetName}}Params(
 	c.{{.GetName}}.Encoding = c.defaultEncoding
 	c.{{.GetName}}.Timeout = c.defaultTimeout
 }
+
+func (c *Client) New{{.GetName}}(
+	{{- range GetServiceSubjectParams .}}
+	{{ . }} string,
+	{{- end}}
+) *{{.GetName}}Client {
+	client := New{{.GetName}}Client(
+		c.nc,
+	{{- range $pkgSubjectParams}}
+		c.pkgParam{{ . }},
+	{{- end}}
+	{{- range GetServiceSubjectParams .}}
+		{{ . }},
+	{{- end}}
+	)
+	client.Encoding = c.defaultEncoding
+	client.Timeout = c.defaultTimeout
+	return client
+}
 {{- end}}
 {{- end}}
 

@@ -669,3 +669,16 @@ func (c *Client) SetSvcSubjectParamsParams(
 	c.SvcSubjectParams.Encoding = c.defaultEncoding
 	c.SvcSubjectParams.Timeout = c.defaultTimeout
 }
+
+func (c *Client) NewSvcSubjectParams(
+	clientid string,
+) *SvcSubjectParamsClient {
+	client := NewSvcSubjectParamsClient(
+		c.nc,
+		c.pkgParaminstance,
+		clientid,
+	)
+	client.Encoding = c.defaultEncoding
+	client.Timeout = c.defaultTimeout
+	return client
+}
