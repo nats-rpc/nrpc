@@ -14,7 +14,7 @@ import (
 
 func TestBasic(t *testing.T) {
 	// Connect to the NATS server.
-	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(natsURL, nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}

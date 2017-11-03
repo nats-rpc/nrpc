@@ -38,7 +38,7 @@ func (s BasicServerImpl) MtFullReplyMessage(
 }
 
 func TestBasicCalls(t *testing.T) {
-	c, err := nats.Connect("nats://localhost:4222")
+	c, err := nats.Connect(natsURL)
 	if err != nil {
 		t.Fatal(err)
 	}

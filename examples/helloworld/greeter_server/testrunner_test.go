@@ -10,8 +10,10 @@ import (
 	natsServer "github.com/nats-io/gnatsd/server"
 )
 
+var natsURL string
+
 func TestMain(m *testing.M) {
-	gnatsd := natsServer.New(&natsServer.Options{})
+	gnatsd := natsServer.New(&natsServer.Options{Port: natsServer.RANDOM_PORT})
 	gnatsd.SetLogger(
 		logger.NewStdLogger(false, false, false, false, false),
 		false, false)
@@ -21,6 +23,7 @@ func TestMain(m *testing.M) {
 	if !gnatsd.ReadyForConnections(time.Second) {
 		log.Fatal("Cannot start the gnatsd server")
 	}
+	natsURL = "nats://" + gnatsd.Addr().String()
 
 	os.Exit(m.Run())
 }

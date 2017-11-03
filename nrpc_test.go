@@ -17,7 +17,7 @@ import (
 //go:generate mv nrpc_test.pb.go nrpcpb_test.go
 
 func TestBasic(t *testing.T) {
-	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestBasic(t *testing.T) {
 }
 
 func TestDecode(t *testing.T) {
-	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestDecode(t *testing.T) {
 }
 
 func TestReply(t *testing.T) {
-	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestReply(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
-	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestError(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}

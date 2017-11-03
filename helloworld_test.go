@@ -33,7 +33,7 @@ func TestHelloWorldExample(t *testing.T) {
 		t.Fatal("Buid client failed", err, string(out))
 	}
 	// run the server
-	server := exec.Command("./examples/helloworld/greeter_server/greeter_server")
+	server := exec.Command("./examples/helloworld/greeter_server/greeter_server", NatsURL)
 	var serverStdout bytes.Buffer
 	server.Stdout = &serverStdout
 	server.Start()
@@ -51,7 +51,7 @@ func TestHelloWorldExample(t *testing.T) {
 	time.Sleep(250 * time.Millisecond)
 
 	// run the client and check its output
-	client := exec.Command("./examples/helloworld/greeter_client/greeter_client")
+	client := exec.Command("./examples/helloworld/greeter_client/greeter_client", NatsURL)
 	timeout := time.AfterFunc(time.Second, func() { client.Process.Kill() })
 	out, err := client.CombinedOutput()
 	timeout.Stop()
