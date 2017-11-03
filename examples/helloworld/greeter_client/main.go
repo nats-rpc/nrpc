@@ -21,7 +21,7 @@ func main() {
 	defer nc.Close()
 
 	// This is our generated client.
-	cli := helloworld.NewGreeterClient(nc, "en", "myid")
+	cli := helloworld.NewGreeterClient(nc)
 
 	// Contact the server and print out its response.
 	resp, err := cli.SayHello(helloworld.HelloRequest{"world"})
@@ -30,21 +30,5 @@ func main() {
 	}
 
 	// print
-	fmt.Printf("Greeting: %s\n", resp.Message)
-
-	// Contact the server and print out its response.
-	resp2, err := cli.SayHello2(helloworld.HelloRequest{"world"})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("Greeting: %s\n", resp2.GetMessage())
-
-	// Contact the server and print out its response.
-	resp3, err := cli.SayHello3(helloworld.HelloRequest{"world"})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("Greeting: %s\n", resp3)
+	fmt.Printf("Greeting: %s\n", resp)
 }

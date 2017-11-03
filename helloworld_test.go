@@ -58,7 +58,7 @@ func TestHelloWorldExample(t *testing.T) {
 	if err != nil {
 		t.Fatal("Run client failed with:", err, ", output was:\n", string(out))
 	}
-	expectedOuput := "Greeting: Hello world\nGreeting: Hello world\nGreeting: Hello world\n"
+	expectedOuput := "Greeting: Hello world\n"
 	if string(out) != expectedOuput {
 		t.Errorf("Wrong client output. Expected '%s', got '%s'",
 			expectedOuput, string(out))
