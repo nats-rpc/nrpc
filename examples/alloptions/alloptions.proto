@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package main;
+
+import "github.com/rapidloop/nrpc/nrpc.proto";
+
+option (nrpc.packageSubject) = "root";
+option (nrpc.packageSubjectParams) = "instance";
+
+service SvcCustomSubject {
+    option (nrpc.serviceSubject) = 'custom_subject';
+
+    rpc MtSimpleReply(StringArg) returns (SimpleStringReply) {}
+    rpc MtFullReplyString(StringArg) returns (FullReplyString) {}
+}
+
+service SvcSubjectParams {
+    option (nrpc.serviceSubjectParams) = "clientid";
+
+    rpc MtFullReplyMessage(StringArg) returns (FullReplyMessage) {}
+}
+
+message NoArgs {}
+
+message StringArg {
+    string arg1 = 1;
+}
+
+message SimpleStringReply {
+    string reply = 1;
+}
+
+message FullReplyString {
+    oneof reply {
+        string result = 1;
+        nrpc.Error error = 2;
+    }
+}
+
+message FullReplyMessage {
+    oneof reply {
+        SimpleStringReply result = 1;
+        nrpc.Error error = 2;
+    }
+}
