@@ -20,30 +20,18 @@ type server struct{}
 
 // SayHello is an implementation of the SayHello method from the definition of
 // the Greeter service.
-func (s *server) SayHello(ctx context.Context, req helloworld.HelloRequest) (resp helloworld.HelloReply, err error) {
-	language := ctx.Value("nrpc-pkg-language").(string)
-	if language != "en" {
-		err = fmt.Errorf("I talk english only")
-	} else {
-		resp.Message = "Hello " + req.Name
-	}
-	clientid := ctx.Value("nrpc-svc-clientid").(string)
-	log.Print("SayHello: clientid=", clientid)
+func (s *server) SayHello(ctx context.Context, req helloworld.HelloRequest) (resp string, err error) {
+	resp = "Hello " + req.Name
 	return
-}
-
-func (s *server) SayHello2(ctx context.Context, req helloworld.HelloRequest) (resp helloworld.HelloReply, err error) {
-	resp.Message = "Hello " + req.Name
-	return
-}
-
-func (s *server) SayHello3(ctx context.Context, req helloworld.HelloRequest) (string, error) {
-	return "Hello " + req.Name, nil
 }
 
 func main() {
+	var natsURL = nats.DefaultURL
+	if len(os.Args) == 2 {
+		natsURL = os.Args[1]
+	}
 	// Connect to the NATS server.
-	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(natsURL, nats.Timeout(5*time.Second))
 	if err != nil {
 		log.Fatal(err)
 	}

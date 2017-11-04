@@ -14,7 +14,7 @@ import (
 
 func TestBasic(t *testing.T) {
 	// Connect to the NATS server.
-	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(natsURL, nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,14 +35,14 @@ func TestBasic(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	// This is our generated client.
-	cli := helloworld.NewGreeterClient(nc, "en", "myid")
+	cli := helloworld.NewGreeterClient(nc)
 
 	// Contact the server and print out its response.
 	resp, err := cli.SayHello(helloworld.HelloRequest{"world"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Message != "Hello world" {
-		t.Fatalf("unexpected message: %s", resp.Message)
+	if resp != "Hello world" {
+		t.Fatalf("unexpected message: %s", resp)
 	}
 }

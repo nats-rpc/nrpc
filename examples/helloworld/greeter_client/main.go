@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	nats "github.com/nats-io/go-nats"
@@ -13,15 +14,19 @@ import (
 )
 
 func main() {
+	var natsURL = nats.DefaultURL
+	if len(os.Args) == 2 {
+		natsURL = os.Args[1]
+	}
 	// Connect to the NATS server.
-	nc, err := nats.Connect(nats.DefaultURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(natsURL, nats.Timeout(5*time.Second))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer nc.Close()
 
 	// This is our generated client.
-	cli := helloworld.NewGreeterClient(nc, "en", "myid")
+	cli := helloworld.NewGreeterClient(nc)
 
 	// Contact the server and print out its response.
 	resp, err := cli.SayHello(helloworld.HelloRequest{"world"})
@@ -30,21 +35,5 @@ func main() {
 	}
 
 	// print
-	fmt.Printf("Greeting: %s\n", resp.Message)
-
-	// Contact the server and print out its response.
-	resp2, err := cli.SayHello2(helloworld.HelloRequest{"world"})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("Greeting: %s\n", resp2.GetMessage())
-
-	// Contact the server and print out its response.
-	resp3, err := cli.SayHello3(helloworld.HelloRequest{"world"})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("Greeting: %s\n", resp3)
+	fmt.Printf("Greeting: %s\n", resp)
 }

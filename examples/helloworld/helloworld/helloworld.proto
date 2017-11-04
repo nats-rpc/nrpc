@@ -14,28 +14,18 @@
 
 syntax = "proto3";
 
-option go_package = "github.com/rapidloop/nrpc/examples/helloworld/helloworld";
-
 option java_multiple_files = true;
 option java_package = "io.grpc.examples.helloworld";
 option java_outer_classname = "HelloWorldProto";
 
-import "github.com/rapidloop/nrpc/nrpc.proto";
+import "nrpc.proto";
 
 package helloworld;
 
-option (nrpc.packageSubject) = "custom";
-option (nrpc.packageSubjectParams) = "language";
-
 // The greeting service definition.
 service Greeter {
-  option (nrpc.serviceSubject) = "greeter";
-  option (nrpc.serviceSubjectParams) = "clientid"; // can be used for permissions
-
   // Sends a greeting
   rpc SayHello (HelloRequest) returns (HelloReply) {}
-  rpc SayHello2 (HelloRequest) returns (HelloFullReply1) {}
-  rpc SayHello3 (HelloRequest) returns (HelloFullReply2) {}
 }
 
 // The request message containing the user's name.
@@ -45,19 +35,6 @@ message HelloRequest {
 
 // The response message containing the greetings
 message HelloReply {
-  string message = 1;
-}
-
-// The 'full' version of HelloReply
-message HelloFullReply1 {
-  oneof reply {
-    HelloReply result = 1;
-    nrpc.Error error = 2;
-  }
-}
-
-// The 'full' version of HelloReply
-message HelloFullReply2 {
   oneof reply {
     string result = 1;
     nrpc.Error error = 2;
