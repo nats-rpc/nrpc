@@ -53,10 +53,12 @@ func ParseSubject(
 ) (packageParams []string, serviceParams []string,
 	name string, encoding string, err error,
 ) {
-	subjectMinSize := packageParamsCount + serviceParamsCount + 2
+	packageSubjectDepth := 0
 	if packageSubject != "" {
-		subjectMinSize++ // the optional package subject prefix
+		packageSubjectDepth = strings.Count(packageSubject, ".") + 1
 	}
+	serviceSubjectDepth := strings.Count(serviceSubject, ".") + 1
+	subjectMinSize := packageSubjectDepth + packageParamsCount + serviceSubjectDepth + serviceParamsCount + 1
 	subjectMaxSize := subjectMinSize + 1 // the optional encoding
 
 	tokens := strings.Split(subject, ".")
@@ -67,25 +69,29 @@ func ParseSubject(
 		return
 	}
 	if packageSubject != "" {
-		if tokens[0] != packageSubject {
-			err = fmt.Errorf(
-				"Invalid subject prefix. Expected '%s', got '%s'",
-				packageSubject, tokens[0])
-			return
+		for i, packageSubjectPart := range strings.Split(packageSubject, ".") {
+			if tokens[i] != packageSubjectPart {
+				err = fmt.Errorf(
+					"Invalid subject prefix. Expected '%s', got '%s'",
+					packageSubjectPart, tokens[i])
+				return
+			}
 		}
-		tokens = tokens[1:]
+		tokens = tokens[packageSubjectDepth:]
 	}
 
 	packageParams = tokens[0:packageParamsCount]
 	tokens = tokens[packageParamsCount:]
 
-	if tokens[0] != serviceSubject {
-		err = fmt.Errorf(
-			"Invalid subject. Service should be '%s', got '%s'",
-			serviceSubject, tokens[0])
-		return
+	for i, serviceSubjectPart := range strings.Split(serviceSubject, ".") {
+		if tokens[i] != serviceSubjectPart {
+			err = fmt.Errorf(
+				"Invalid subject. Service should be '%s', got '%s'",
+				serviceSubjectPart, tokens[i])
+			return
+		}
 	}
-	tokens = tokens[1:]
+	tokens = tokens[serviceSubjectDepth:]
 
 	serviceParams = tokens[0:serviceParamsCount]
 	tokens = tokens[serviceParamsCount:]
