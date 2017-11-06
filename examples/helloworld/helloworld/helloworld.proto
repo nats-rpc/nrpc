@@ -35,8 +35,5 @@ message HelloRequest {
 
 // The response message containing the greetings
 message HelloReply {
-  oneof reply {
-    string result = 1;
-    nrpc.Error error = 2;
-  }
+  string message = 1;
 }
