@@ -226,7 +226,39 @@ var funcMap = template.FuncMap{
 				return *value
 			}
 		}
+		if opts := currentFile.GetOptions(); opts != nil {
+			s, err := proto.GetExtension(opts, nrpc.E_ServiceSubjectRule)
+			if err == nil {
+				switch *(s.(*nrpc.SubjectRule)) {
+				case nrpc.SubjectRule_COPY:
+					return sd.GetName()
+				case nrpc.SubjectRule_TOLOWER:
+					return strings.ToLower(sd.GetName())
+				}
+			}
+		}
 		return sd.GetName()
+	},
+	"GetMethodSubject": func(md *descriptor.MethodDescriptorProto) string {
+		if opts := md.GetOptions(); opts != nil {
+			s, err := proto.GetExtension(opts, nrpc.E_MethodSubject)
+			if err == nil {
+				value := s.(*string)
+				return *value
+			}
+		}
+		if opts := currentFile.GetOptions(); opts != nil {
+			s, err := proto.GetExtension(opts, nrpc.E_MethodSubjectRule)
+			if err == nil {
+				switch *(s.(*nrpc.SubjectRule)) {
+				case nrpc.SubjectRule_COPY:
+					return md.GetName()
+				case nrpc.SubjectRule_TOLOWER:
+					return strings.ToLower(md.GetName())
+				}
+			}
+		}
+		return md.GetName()
 	},
 	"GetServiceSubjectParams": func(sd *descriptor.ServiceDescriptorProto) []string {
 		if opts := sd.GetOptions(); opts != nil {
@@ -273,6 +305,7 @@ var funcMap = template.FuncMap{
 }
 
 var request plugin.CodeGeneratorRequest
+var currentFile *descriptor.FileDescriptorProto
 
 func main() {
 
@@ -308,6 +341,8 @@ func main() {
 		if fd == nil {
 			log.Fatalf("could not find the .proto file for %s", name)
 		}
+
+		currentFile = fd
 
 		var buf bytes.Buffer
 		if err := tmpl.Execute(&buf, fd); err != nil {

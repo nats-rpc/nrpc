@@ -6,18 +6,32 @@ option go_package = "github.com/rapidloop/nrpc";
 
 import "google/protobuf/descriptor.proto";
 
+enum SubjectRule {
+    COPY = 0;
+    TOLOWER = 1;
+}
+
 extend google.protobuf.FileOptions {
     // A custom subject prefix to use instead of the package name
     string packageSubject = 50000;
     // Parameters included in the subject at the package level
     repeated string packageSubjectParams = 50001;
+    // Default rule to build a service subject from the service name
+    SubjectRule serviceSubjectRule = 50002;
+    // Default rule to build a method subject from its name
+    SubjectRule methodSubjectRule = 50003;
 }
 
 extend google.protobuf.ServiceOptions {
-	// A custom subject token to use instead of the service name
-	string serviceSubject = 50002;
+	// A custom subject token to use instead of (service name + serviceSubjectRule)
+	string serviceSubject = 51000;
 	// Parameters included in the subject at the service level
-	repeated string serviceSubjectParams = 50003;
+	repeated string serviceSubjectParams = 51001;
+}
+
+extend google.protobuf.MethodOptions {
+    // A custom subject to use instead of (methor name + methodSubjectRule)
+    string methodSubject = 52000;
 }
 
 message Error {

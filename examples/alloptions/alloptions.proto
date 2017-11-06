@@ -7,11 +7,16 @@ import "github.com/rapidloop/nrpc/nrpc.proto";
 option (nrpc.packageSubject) = "root";
 option (nrpc.packageSubjectParams) = "instance";
 
+option (nrpc.serviceSubjectRule) = TOLOWER;
+option (nrpc.methodSubjectRule) = TOLOWER;
+
 service SvcCustomSubject {
     option (nrpc.serviceSubject) = 'custom_subject';
 
     rpc MtSimpleReply(StringArg) returns (SimpleStringReply) {}
-    rpc MtFullReplyString(StringArg) returns (FullReplyString) {}
+    rpc MtFullReplyString(StringArg) returns (FullReplyString) {
+        option (nrpc.methodSubject) = "mt_full_reply_string";
+    }
 }
 
 service SvcSubjectParams {

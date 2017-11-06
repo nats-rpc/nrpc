@@ -49,7 +49,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 	var resp proto.Message
 	var replyError *nrpc.Error
 	switch name {
-	case "MtSimpleReply":
+	case "mtsimplereply":
 		var req StringArg
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("MtSimpleReplyHandler: MtSimpleReply request unmarshal failed: %v", err)
@@ -70,7 +70,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 				log.Printf("MtSimpleReplyHandler: MtSimpleReply handler failed: %s", replyError.Error())
 			}
 		}
-	case "MtFullReplyString":
+	case "mt_full_reply_string":
 		var req StringArg
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("MtFullReplyStringHandler: MtFullReplyString request unmarshal failed: %v", err)
@@ -133,7 +133,7 @@ func NewSvcCustomSubjectClient(nc *nats.Conn, pkgParaminstance string) *SvcCusto
 
 func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleStringReply, err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "MtSimpleReply";
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtsimplereply";
 
 	// call
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
@@ -146,7 +146,7 @@ func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleString
 
 func (c *SvcCustomSubjectClient) MtFullReplyString(req StringArg) (resp string, err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "MtFullReplyString";
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mt_full_reply_string";
 
 	// call
 	var reply FullReplyString
@@ -181,13 +181,13 @@ func NewSvcSubjectParamsHandler(ctx context.Context, nc *nats.Conn, s SvcSubject
 }
 
 func (h *SvcSubjectParamsHandler) Subject() string {
-	return "root.*.SvcSubjectParams.*.>"
+	return "root.*.svcsubjectparams.*.>"
 }
 
 func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 	// extract method name & encoding from subject
 	pkgParams, svcParams, name, encoding, err := nrpc.ParseSubject(
-		"root", 1, "SvcSubjectParams", 1, msg.Subject)
+		"root", 1, "svcsubjectparams", 1, msg.Subject)
 
 	ctx := h.ctx
 	ctx = context.WithValue(ctx, "nrpc-pkg-instance", pkgParams[0])
@@ -196,7 +196,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 	var resp proto.Message
 	var replyError *nrpc.Error
 	switch name {
-	case "MtFullReplyMessage":
+	case "mtfullreplymessage":
 		var req StringArg
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("MtFullReplyMessageHandler: MtFullReplyMessage request unmarshal failed: %v", err)
@@ -251,7 +251,7 @@ func NewSvcSubjectParamsClient(nc *nats.Conn, pkgParaminstance string, svcParamc
 		nc:      nc,
 		PkgSubject: "root",
 		PkgParaminstance: pkgParaminstance,
-		Subject: "SvcSubjectParams",
+		Subject: "svcsubjectparams",
 		SvcParamclientid: svcParamclientid,
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
@@ -261,7 +261,7 @@ func NewSvcSubjectParamsClient(nc *nats.Conn, pkgParaminstance string, svcParamc
 
 func (c *SvcSubjectParamsClient) MtFullReplyMessage(req StringArg) (resp SimpleStringReply, err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "MtFullReplyMessage";
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtfullreplymessage";
 
 	// call
 	var reply FullReplyMessage

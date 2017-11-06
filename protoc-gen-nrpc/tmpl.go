@@ -132,7 +132,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 	switch name {
 	{{- $serviceName := .GetName}}{{- range .Method}}
-	case "{{.GetName}}":
+	case "{{GetMethodSubject .}}":
 		var req {{GetPkg $pkgName .GetInputType}}
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("{{.GetName}}Handler: {{.GetName}} request unmarshal failed: %v", err)
@@ -268,7 +268,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 	    c.PkgParam{{.}} + "." + {{end -}}
 	c.Subject + "." + {{range $serviceSubjectParams -}}
 	    c.SvcParam{{.}} + "." + {{end -}}
-	"{{.GetName}}";
+	"{{GetMethodSubject .}}";
 
 	// call
 	{{- if HasFullReply .}}
