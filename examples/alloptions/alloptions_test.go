@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/nats-io/go-nats"
+	"github.com/rapidloop/nrpc"
 )
 
 type BasicServerImpl struct {
@@ -34,6 +36,21 @@ func (s BasicServerImpl) MtFullReplyMessage(
 		s.t.Error("Got an invalid nrpc-svc-clientid:", ctx.Value("nrpc-svc-clientid"))
 	}
 	resp.Reply = args.Arg1
+	return
+}
+
+func (s BasicServerImpl) MtWithSubjectParams(
+	ctx context.Context, mp1 string, mp2 string, req NoArgs,
+) (
+	resp SimpleStringReply, err error,
+) {
+	if mp1 != "p1" {
+		err = fmt.Errorf("Expects method param mp1 = 'p1', got '%s'", mp1)
+	}
+	if mp2 != "p2" {
+		err = fmt.Errorf("Expects method param mp2 = 'p2', got '%s'", mp2)
+	}
+	resp.Reply = "Hi"
 	return
 }
 
@@ -87,5 +104,25 @@ func TestBasicCalls(t *testing.T) {
 	}
 	if r.GetReply() != "hi" {
 		t.Error("Invalid reply:", r.GetReply())
+	}
+
+	r, err = c2.MtWithSubjectParams("p1", "p2", NoArgs{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.GetReply() != "Hi" {
+		t.Error("Invalid reply:", r.GetReply())
+	}
+
+	r, err = c2.MtWithSubjectParams("invalid", "p2", NoArgs{})
+	if err == nil {
+		t.Error("Expected an error")
+	}
+	if nErr, ok := err.(*nrpc.Error); ok {
+		if nErr.Type != nrpc.Error_CLIENT || nErr.Message != "Expects method param mp1 = 'p1', got 'invalid'" {
+			t.Errorf("Unexpected error %#v", *nErr)
+		}
+	} else {
+		t.Errorf("Expected a nrpc.Error, got %#v", err)
 	}
 }

@@ -30,7 +30,11 @@ import (
 type {{.GetName}}Server interface {
 	{{- range .Method}}
 	{{- $resultType := GetResultType .}}
-	{{.GetName}}(ctx context.Context, req {{GoType .GetInputType}}) (resp {{GoType $resultType}}, err error)
+	{{.GetName}}(ctx context.Context
+		{{- range GetMethodSubjectParams . -}}
+		, {{ . }} string
+		{{- end -}}
+	, req {{GoType .GetInputType}}) (resp {{GoType $resultType}}, err error)
 	{{- end}}
 }
 
@@ -114,11 +118,16 @@ func (h *{{.GetName}}Handler) Subject() string {
 }
 
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
+	var encoding string
 	// extract method name & encoding from subject
 	{{ if ne 0 (len $pkgSubjectParams)}}pkgParams{{else}}_{{end -}},
 	{{- if ne 0 (len (GetServiceSubjectParams .))}} svcParams{{else}} _{{end -}}
-	, name, encoding, err := nrpc.ParseSubject(
+	, name, tail, err := nrpc.ParseSubject(
 		"{{$pkgSubject}}", {{len $pkgSubjectParams}}, "{{GetServiceSubject .}}", {{len (GetServiceSubjectParams .)}}, msg.Subject)
+	if err != nil {
+		log.Printf("{{.GetName}}Hanlder: {{.GetName}} subject parsing failed: %v", err)
+		return
+	}
 
 	ctx := h.ctx
 	{{- range $i, $name := $pkgSubjectParams }}
@@ -136,6 +145,14 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	switch name {
 	{{- $serviceName := .GetName}}{{- range .Method}}
 	case "{{GetMethodSubject .}}":
+		{{- if ne 0 (len (GetMethodSubjectParams .))}}
+		var mtParams []string
+		{{- end}}
+		{{if eq 0 (len (GetMethodSubjectParams .))}}_{{else}}mtParams{{end}}, encoding, err = nrpc.ParseSubjectTail({{len (GetMethodSubjectParams .)}}, tail)
+		if err != nil {
+			log.Printf("{{.GetName}}Hanlder: {{.GetName}} subject parsing failed: %v", err)
+			break
+		}
 		var req {{GoType .GetInputType}}
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("{{.GetName}}Handler: {{.GetName}} request unmarshal failed: %v", err)
@@ -154,7 +171,11 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 			{{- if HasFullReply . }}
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
-					result, err := h.server.{{.GetName}}(ctx, req)
+					result, err := h.server.{{.GetName}}(ctx
+					{{- range $i, $p := GetMethodSubjectParams . -}}
+					, mtParams[{{ $i }}]
+					{{- end -}}
+					, req)
 					if err != nil {
 						return nil, err
 					}
@@ -167,7 +188,11 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 			{{- else}}
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
-					innerResp, err := h.server.{{.GetName}}(ctx, req)
+					innerResp, err := h.server.{{.GetName}}(ctx
+					{{- range $i, $p := GetMethodSubjectParams . -}}
+					, mtParams[{{ $i }}]
+					{{- end -}}
+					, req)
 					if err != nil {
 						return nil, err
 					}
@@ -260,7 +285,10 @@ func New{{.GetName}}Client(nc nrpc.NatsConn
 {{$serviceSubjectParams := GetServiceSubjectParams .}}
 {{- range .Method}}
 {{- $resultType := GetResultType .}}
-func (c *{{$serviceName}}Client) {{.GetName}}(req {{GoType .GetInputType}}) (resp {{GoType $resultType}}, err error) {
+func (c *{{$serviceName}}Client) {{.GetName}}(
+	{{- range GetMethodSubjectParams . -}}
+	{{ . }} string, {{ end -}}
+	req {{GoType .GetInputType}}) (resp {{GoType $resultType}}, err error) {
 {{- if Prometheus}}
 	start := time.Now()
 {{- end}}
@@ -271,7 +299,9 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GoType .GetInputType}}) (res
 	    c.PkgParam{{.}} + "." + {{end -}}
 	c.Subject + "." + {{range $serviceSubjectParams -}}
 	    c.SvcParam{{.}} + "." + {{end -}}
-	"{{GetMethodSubject .}}";
+	"{{GetMethodSubject .}}"
+	{{- range GetMethodSubjectParams . }} + "." + {{ . }}{{ end -}}
+	;
 
 	// call
 	{{- if HasFullReply .}}

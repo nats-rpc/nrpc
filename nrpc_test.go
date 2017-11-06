@@ -296,33 +296,41 @@ func TestParseSubject(t *testing.T) {
 		pkgParamsCount int
 		svcSubject     string
 		svcParamsCount int
+		mtParamsCount  int
 		subject        string
 		pkgParams      []string
 		svcParams      []string
+		mtParams       []string
 		name           string
 		encoding       string
 		err            string
 	}{
-		{"", 0, "foo", 0, "foo.bar", nil, nil, "bar", "protobuf", ""},
-		{"", 0, "foo", 0, "foo.bar.protobuf", nil, nil, "bar", "protobuf", ""},
-		{"", 0, "foo", 0, "foo.bar.json", nil, nil, "bar", "json", ""},
-		{"", 0, "foo", 0, "foo.bar.json.protobuf", nil, nil, "", "",
-			"Invalid subject len. Expects number of parts between 2 and 3, got 4"},
-		{"demo", 0, "foo", 0, "demo.foo.bar", nil, nil, "bar", "protobuf", ""},
-		{"demo", 0, "foo", 0, "demo.foo.bar.json", nil, nil, "bar", "json", ""},
-		{"demo", 0, "foo", 0, "foo.bar.json", nil, nil, "", "",
+		{"", 0, "foo", 0, 0, "foo.bar", nil, nil, nil, "bar", "protobuf", ""},
+		{"", 0, "foo", 0, 0, "foo.bar.protobuf", nil, nil, nil, "bar", "protobuf", ""},
+		{"", 0, "foo", 0, 0, "foo.bar.json", nil, nil, nil, "bar", "json", ""},
+		{"", 0, "foo", 0, 0, "foo.bar.json.protobuf", nil, nil, nil, "bar", "",
+			"Invalid subject tail length. Expects 0 or 1 parts, got 2"},
+		{"demo", 0, "foo", 0, 0, "demo.foo.bar", nil, nil, nil, "bar", "protobuf", ""},
+		{"demo", 0, "foo", 0, 0, "demo.foo.bar.json", nil, nil, nil, "bar", "json", ""},
+		{"demo", 0, "foo", 0, 0, "foo.bar.json", nil, nil, nil, "", "",
 			"Invalid subject prefix. Expected 'demo', got 'foo'"},
-		{"demo", 2, "foo", 0, "demo.p1.p2.foo.bar.json", []string{"p1", "p2"}, nil, "bar", "json", ""},
-		{"demo", 2, "foo", 1, "demo.p1.p2.foo.sp1.bar.json", []string{"p1", "p2"}, []string{"sp1"}, "bar", "json", ""},
-		{"demo.pkg", 1, "nested.svc", 1, "demo.pkg.p1.nested.svc.sp1.bar",
-			[]string{"p1"}, []string{"sp1"}, "bar", "protobuf", ""},
+		{"demo", 2, "foo", 0, 0, "demo.p1.p2.foo.bar.json", []string{"p1", "p2"}, nil, nil, "bar", "json", ""},
+		{"demo", 2, "foo", 1, 0, "demo.p1.p2.foo.sp1.bar.json", []string{"p1", "p2"}, []string{"sp1"}, nil, "bar", "json", ""},
+		{"demo.pkg", 1, "nested.svc", 1, 0, "demo.pkg.p1.nested.svc.sp1.bar",
+			[]string{"p1"}, []string{"sp1"}, nil, "bar", "protobuf", ""},
 	} {
-		pkgParams, svcParams, name, encoding, err := nrpc.ParseSubject(
+		pkgParams, svcParams, name, tail, err := nrpc.ParseSubject(
 			tt.pkgSubject, tt.pkgParamsCount,
 			tt.svcSubject, tt.svcParamsCount,
 			tt.subject)
+		var mtParams []string
+		var encoding string
+		if err == nil {
+			mtParams, encoding, err = nrpc.ParseSubjectTail(tt.mtParamsCount, tail)
+		}
 		compareStringSlices(t, tt.pkgParams, pkgParams)
 		compareStringSlices(t, tt.svcParams, svcParams)
+		compareStringSlices(t, tt.mtParams, mtParams)
 		if name != tt.name {
 			t.Errorf("test %d: Expected name=%s, got %s", i, tt.name, name)
 		}

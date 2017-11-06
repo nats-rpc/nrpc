@@ -87,9 +87,14 @@ func (h *GreeterHandler) Subject() string {
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
+	var encoding string
 	// extract method name & encoding from subject
-	_, _, name, encoding, err := nrpc.ParseSubject(
+	_, _, name, tail, err := nrpc.ParseSubject(
 		"helloworld", 0, "Greeter", 0, msg.Subject)
+	if err != nil {
+		log.Printf("GreeterHanlder: Greeter subject parsing failed: %v", err)
+		return
+	}
 
 	ctx := h.ctx
 	// call handler and form response
@@ -98,6 +103,11 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	var elapsed float64
 	switch name {
 	case "SayHello":
+		_, encoding, err = nrpc.ParseSubjectTail(0, tail)
+		if err != nil {
+			log.Printf("SayHelloHanlder: SayHello subject parsing failed: %v", err)
+			break
+		}
 		var req HelloRequest
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)

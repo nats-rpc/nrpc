@@ -371,6 +371,14 @@ var funcMap = template.FuncMap{
 		}
 		return md.GetName()
 	},
+	"GetMethodSubjectParams": func(md *descriptor.MethodDescriptorProto) []string {
+		if opts := md.GetOptions(); opts != nil {
+			if e, err := proto.GetExtension(opts, nrpc.E_MethodSubjectParams); err == nil {
+				return e.([]string)
+			}
+		}
+		return []string{}
+	},
 	"GetServiceSubjectParams": func(sd *descriptor.ServiceDescriptorProto) []string {
 		if opts := sd.GetOptions(); opts != nil {
 			if e, err := proto.GetExtension(opts, nrpc.E_ServiceSubjectParams); err == nil {
