@@ -20,6 +20,11 @@ type Reply interface {
 	GetError() *Error
 }
 
+type NatsConn interface {
+	Request(subj string, data []byte, timeout time.Duration) (*nats.Msg, error)
+	Publish(subj string, data []byte) error
+}
+
 func (e *Error) Error() string {
 	return fmt.Sprintf("%s error: %s", Error_Type_name[int32(e.Type)], e.Message)
 }
@@ -110,7 +115,7 @@ func ParseSubject(
 	return
 }
 
-func Call(req proto.Message, rep proto.Message, nc *nats.Conn, subject string, encoding string, timeout time.Duration) error {
+func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, encoding string, timeout time.Duration) error {
 	// encode request
 	rawRequest, err := Marshal(encoding, req)
 	if err != nil {
@@ -158,7 +163,7 @@ func Call(req proto.Message, rep proto.Message, nc *nats.Conn, subject string, e
 	return nil
 }
 
-func Publish(resp proto.Message, withError *Error, nc *nats.Conn, subject string, encoding string) error {
+func Publish(resp proto.Message, withError *Error, nc NatsConn, subject string, encoding string) error {
 	if _, ok := resp.(Reply); !ok {
 		// wrap the response in a RPCResponse
 		if withError == nil { // send any inner object only if error is unset

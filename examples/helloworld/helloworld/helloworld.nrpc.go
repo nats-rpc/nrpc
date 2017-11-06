@@ -21,11 +21,11 @@ type GreeterServer interface {
 // subscription using a given GreeterServer implementation.
 type GreeterHandler struct {
 	ctx    context.Context
-	nc     *nats.Conn
+	nc     nrpc.NatsConn
 	server GreeterServer
 }
 
-func NewGreeterHandler(ctx context.Context, nc *nats.Conn, s GreeterServer) *GreeterHandler {
+func NewGreeterHandler(ctx context.Context, nc nrpc.NatsConn, s GreeterServer) *GreeterHandler {
 	return &GreeterHandler{
 		ctx:    ctx,
 		nc:     nc,
@@ -88,14 +88,14 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 }
 
 type GreeterClient struct {
-	nc      *nats.Conn
+	nc      nrpc.NatsConn
 	PkgSubject string
 	Subject string
 	Encoding string
 	Timeout time.Duration
 }
 
-func NewGreeterClient(nc *nats.Conn) *GreeterClient {
+func NewGreeterClient(nc nrpc.NatsConn) *GreeterClient {
 	return &GreeterClient{
 		nc:      nc,
 		PkgSubject: "helloworld",
