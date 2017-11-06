@@ -44,10 +44,3 @@ message Error {
     Type type = 1;
 	string message = 2;
 }
-
-message RPCResponse {
-    oneof reply {
-        bytes result = 1;
-        nrpc.Error error = 2;
-    }
-}

@@ -266,8 +266,52 @@ func TestUnmarshal(t *testing.T) {
 			}
 			if msg != encodingTestMsg {
 				t.Errorf(
-					"Json decode failed. Expected %#v, got %#v",
-					encodingTestMsg, msg)
+					"%s decode failed. Expected %#v, got %#v",
+					tt.encoding, encodingTestMsg, msg)
+			}
+		})
+	}
+}
+
+func TestMarshalUnmarshalResponse(t *testing.T) {
+	for _, tt := range encodingTests {
+		t.Run("UnmarshalResponse"+tt.encoding, func(t *testing.T) {
+			var msg DummyMessage
+			err := nrpc.UnmarshalResponse(tt.encoding, tt.data, &msg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if msg != encodingTestMsg {
+				t.Errorf(
+					"%s decode failed. Expected %#v, got %#v",
+					tt.encoding, encodingTestMsg, msg)
+			}
+		})
+		t.Run("MarshalErrorResponse"+tt.encoding, func(t *testing.T) {
+			data, err := nrpc.MarshalErrorResponse(tt.encoding, &nrpc.Error{
+				Type: nrpc.Error_CLIENT, Message: "Some error",
+			})
+			if err != nil {
+				t.Fatal("Unexpected error:", err)
+			}
+			switch tt.encoding {
+			case "protobuf":
+				if data[0] != 0 {
+					t.Error("Expects payload to start with a '0', got", data[0])
+				}
+			case "json":
+				if string(data[:13]) != "{\"__error__\":" {
+					t.Error("Expects payload to start with '{\"__error__\":', got", string(data[:13]))
+				}
+			}
+			var msg DummyMessage
+			err = nrpc.UnmarshalResponse(tt.encoding, data, &msg)
+			repErr, ok := err.(*nrpc.Error)
+			if !ok {
+				t.Errorf("Expected a nrpc.Error, got %#v", err)
+			}
+			if repErr.Type != nrpc.Error_CLIENT || repErr.Message != "Some error" {
+				t.Errorf("Unexpected err: %#v", *repErr)
 			}
 		})
 	}
