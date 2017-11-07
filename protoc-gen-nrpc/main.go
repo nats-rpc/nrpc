@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -94,7 +95,7 @@ func goFileName(d *descriptor.FileDescriptorProto) string {
 	return name
 }
 
-func goType(td *descriptor.FieldDescriptorProto) string {
+func fieldGoType(td *descriptor.FieldDescriptorProto) string {
 	// Use protoc-gen-go generator to get the actual go type (for plain types
 	// only!)
 	t, _ := (*generator.Generator)(nil).GoType(nil, td)
@@ -115,6 +116,16 @@ func splitMessageTypeName(name string) (string, string) {
 	return name[1:lastDot], name[lastDot+1:]
 }
 
+func splitTypePath(name string) []string {
+	if len(name) == 0 {
+		log.Fatal("Empty message type")
+	}
+	if name[0] != '.' {
+		log.Fatalf("Expect message type name to start with '.', but it is '%s'", name)
+	}
+	return strings.Split(name[1:], ".")
+}
+
 func lookupFileDescriptor(name string) *descriptor.FileDescriptorProto {
 	for _, fd := range request.GetProtoFile() {
 		if fd.GetPackage() == name {
@@ -124,18 +135,51 @@ func lookupFileDescriptor(name string) *descriptor.FileDescriptorProto {
 	return nil
 }
 
-func lookupMessageType(name string) *descriptor.DescriptorProto {
-	pkgname, msgname := splitMessageTypeName(name)
-	fd := lookupFileDescriptor(pkgname)
-	if fd == nil {
-		log.Fatalf("Could not find the .proto file for package '%s'", pkgname)
+func lookupMessageType(name string) (*descriptor.FileDescriptorProto, *descriptor.DescriptorProto) {
+	path := splitTypePath(name)
+
+	pkgpath := path[:len(path)-1]
+
+	var fd *descriptor.FileDescriptorProto
+	for {
+		pkgname := strings.Join(pkgpath, ".")
+		fd = lookupFileDescriptor(pkgname)
+		if fd != nil {
+			break
+		}
+		if len(pkgpath) == 1 {
+			log.Fatalf("Could not find the .proto file for package '%s' (from message %s)", pkgname, name)
+		}
+		pkgpath = pkgpath[:len(pkgpath)-1]
 	}
+
+	path = path[len(pkgpath):]
+
+	var d *descriptor.DescriptorProto
 	for _, mt := range fd.GetMessageType() {
-		if mt.GetName() == msgname {
-			return mt
+		if mt.GetName() == path[0] {
+			d = mt
+			break
 		}
 	}
-	return nil
+	if d == nil {
+		log.Fatalf("No such type '%s' in package '%s'", path[0], strings.Join(pkgpath, "."))
+	}
+	for i, token := range path[1:] {
+		var found bool
+		for _, nd := range d.GetNestedType() {
+			if nd.GetName() == token {
+				d = nd
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Fatalf("No such nested type '%s' in '%s.%s'",
+				token, strings.Join(pkgpath, "."), strings.Join(path[:i+1], "."))
+		}
+	}
+	return fd, d
 }
 
 func getField(d *descriptor.DescriptorProto, name string) *descriptor.FieldDescriptorProto {
@@ -190,6 +234,40 @@ func pkgSubject(fd *descriptor.FileDescriptorProto) string {
 	return fd.GetPackage()
 }
 
+func getResultType(
+	md *descriptor.MethodDescriptorProto,
+) string {
+	_, d := lookupMessageType(md.GetOutputType())
+
+	resultField, _ := matchReply(d)
+
+	if resultField != nil {
+		if resultField.GetTypeName() == "" {
+			return fieldGoType(resultField)
+		}
+		return resultField.GetTypeName()
+	}
+	return md.GetOutputType()
+}
+
+func getGoType(pbType string) (string, string) {
+	if !strings.Contains(pbType, ".") {
+		return "", pbType
+	}
+	fd, _ := lookupMessageType(pbType)
+	name := strings.TrimPrefix(pbType, "."+fd.GetPackage()+".")
+	name = strings.Replace(name, ".", "_", -1)
+	return fd.GetOptions().GetGoPackage(), name
+}
+
+func getPkgImportName(goPkg string) string {
+	if goPkg == currentFile.GetOptions().GetGoPackage() {
+		return ""
+	}
+	replacer := strings.NewReplacer(".", "_", "/", "_", "-", "_")
+	return replacer.Replace(goPkg)
+}
+
 var pluginPrometheus bool
 
 var funcMap = template.FuncMap{
@@ -202,6 +280,39 @@ var funcMap = template.FuncMap{
 		s = strings.TrimPrefix(s, pkg)
 		s = strings.TrimPrefix(s, ".")
 		return s
+	},
+	"GetExtraImports": func(fd *descriptor.FileDescriptorProto) []string {
+		// check all the types used and imports packages from where they come
+		var imports = make(map[string]string)
+		for _, sd := range fd.GetService() {
+			for _, md := range sd.GetMethod() {
+				goPkg, _ := getGoType(md.GetInputType())
+				pkgImportName := getPkgImportName(goPkg)
+				if pkgImportName != "" {
+					imports[pkgImportName] = goPkg
+				}
+				goPkg, _ = getGoType(md.GetOutputType())
+				pkgImportName = getPkgImportName(goPkg)
+				if pkgImportName != "" {
+					imports[pkgImportName] = goPkg
+				}
+				goPkg, _ = getGoType(getResultType(md))
+				pkgImportName = getPkgImportName(goPkg)
+				if pkgImportName != "" {
+					imports[pkgImportName] = goPkg
+				}
+			}
+		}
+		var result []string
+		for importName, goPkg := range imports {
+			result = append(result,
+				fmt.Sprintf("%s \"%s\"",
+					importName,
+					goPkg,
+				),
+			)
+		}
+		return result
 	},
 	"GetPkgSubjectPrefix": func(fd *descriptor.FileDescriptorProto) string {
 		if s := pkgSubject(fd); s != "" {
@@ -274,33 +385,29 @@ var funcMap = template.FuncMap{
 	"HasFullReply": func(
 		md *descriptor.MethodDescriptorProto,
 	) bool {
-		d := lookupMessageType(md.GetOutputType())
+		_, d := lookupMessageType(md.GetOutputType())
 		resultField, _ := matchReply(d)
 		return resultField != nil
 	},
-	"GetResultType": func(
-		md *descriptor.MethodDescriptorProto,
-	) string {
-		d := lookupMessageType(md.GetOutputType())
-
-		resultField, _ := matchReply(d)
-
-		if resultField != nil {
-			if resultField.GetTypeName() == "" {
-				return goType(resultField)
-			}
-			return resultField.GetTypeName()
-		}
-		return md.GetOutputType()
-	},
+	"GetResultType": getResultType,
 	"HasPointerResultType": func(
 		md *descriptor.MethodDescriptorProto,
 	) bool {
-		d := lookupMessageType(md.GetOutputType())
+		_, d := lookupMessageType(md.GetOutputType())
 
 		resultField, _ := matchReply(d)
 
 		return resultField.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE
+	},
+	"GoType": func(pbType string) string {
+		goPkg, goType := getGoType(pbType)
+		if goPkg != "" {
+			importName := getPkgImportName(goPkg)
+			if importName != "" {
+				goType = importName + "." + goType
+			}
+		}
+		return goType
 	},
 }
 
@@ -348,6 +455,8 @@ func main() {
 		if err := tmpl.Execute(&buf, fd); err != nil {
 			log.Fatal(err)
 		}
+
+		currentFile = nil
 
 		response.File = append(response.File, &plugin.CodeGeneratorResponse_File{
 			Name:    proto.String(goFileName(fd)),

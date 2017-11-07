@@ -15,6 +15,9 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/go-nats"
+	{{- range  GetExtraImports .}}
+	{{.}}
+	{{- end}}
 	{{- if Prometheus}}
 	"github.com/prometheus/client_golang/prometheus"
 	{{- end}}
@@ -27,7 +30,7 @@ import (
 type {{.GetName}}Server interface {
 	{{- range .Method}}
 	{{- $resultType := GetResultType .}}
-	{{.GetName}}(ctx context.Context, req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName $resultType}}, err error)
+	{{.GetName}}(ctx context.Context, req {{GoType .GetInputType}}) (resp {{GoType $resultType}}, err error)
 	{{- end}}
 }
 
@@ -133,7 +136,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	switch name {
 	{{- $serviceName := .GetName}}{{- range .Method}}
 	case "{{GetMethodSubject .}}":
-		var req {{GetPkg $pkgName .GetInputType}}
+		var req {{GoType .GetInputType}}
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("{{.GetName}}Handler: {{.GetName}} request unmarshal failed: %v", err)
 			replyError = &nrpc.Error{
@@ -155,8 +158,8 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 					if err != nil {
 						return nil, err
 					}
-					return &{{ GetPkg $pkgName .GetOutputType }}{
-						&{{ GetPkg $pkgName .GetOutputType }}_Result{
+					return &{{ GoType .GetOutputType }}{
+						&{{ GoType .GetOutputType }}_Result{
 							Result: {{if HasPointerResultType .}}&{{end}}result,
 						},
 					}, err
@@ -257,7 +260,7 @@ func New{{.GetName}}Client(nc nrpc.NatsConn
 {{$serviceSubjectParams := GetServiceSubjectParams .}}
 {{- range .Method}}
 {{- $resultType := GetResultType .}}
-func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputType}}) (resp {{GetPkg $pkgName $resultType}}, err error) {
+func (c *{{$serviceName}}Client) {{.GetName}}(req {{GoType .GetInputType}}) (resp {{GoType $resultType}}, err error) {
 {{- if Prometheus}}
 	start := time.Now()
 {{- end}}
@@ -272,7 +275,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(req {{GetPkg $pkgName .GetInputTyp
 
 	// call
 	{{- if HasFullReply .}}
-	var reply {{GetPkg $pkgName .GetOutputType}}
+	var reply {{GoType .GetOutputType}}
 	err = nrpc.Call(&req, &reply, c.nc, subject, c.Encoding, c.Timeout)
 	{{- else}}
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
