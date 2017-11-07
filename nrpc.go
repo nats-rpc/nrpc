@@ -16,11 +16,6 @@ import (
 
 //go:generate protoc --go_out=../../.. nrpc.proto
 
-type Reply interface {
-	proto.Message
-	GetError() *Error
-}
-
 type NatsConn interface {
 	Request(subj string, data []byte, timeout time.Duration) (*nats.Msg, error)
 	Publish(subj string, data []byte) error
@@ -200,24 +195,11 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 
 	data := msg.Data
 
-	// If the reply type is not a Reply implementation, if will be encapsulated
-	// in a RPCResponse
-	if _, ok := rep.(Reply); !ok {
-		err := UnmarshalResponse(encoding, data, rep)
-		if err != nil {
+	if err := UnmarshalResponse(encoding, data, rep); err != nil {
+		if _, isError := err.(*Error); !isError {
 			log.Printf("nrpc: response unmarshal failed: %v", err)
 		}
 		return err
-	}
-
-	// decode rpc reponse
-	if err := Unmarshal(encoding, data, rep); err != nil {
-		log.Printf("nrpc: response unmarshal failed: %v", err)
-		return err
-	}
-
-	if reply, ok := rep.(Reply); ok && reply.GetError() != nil {
-		return reply.GetError()
 	}
 
 	return nil
@@ -227,7 +209,7 @@ func Publish(resp proto.Message, withError *Error, nc NatsConn, subject string, 
 	var rawResponse []byte
 	var err error
 
-	if _, ok := resp.(Reply); !ok && withError != nil {
+	if withError != nil {
 		rawResponse, err = MarshalErrorResponse(encoding, withError)
 	} else {
 		rawResponse, err = Marshal(encoding, resp)

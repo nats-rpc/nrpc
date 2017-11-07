@@ -13,16 +13,14 @@ option (nrpc.methodSubjectRule) = TOLOWER;
 service SvcCustomSubject {
     option (nrpc.serviceSubject) = 'custom_subject';
 
-    rpc MtSimpleReply(StringArg) returns (SimpleStringReply) {}
-    rpc MtFullReplyString(StringArg) returns (FullReplyString) {
-        option (nrpc.methodSubject) = "mt_full_reply_string";
+    rpc MtSimpleReply(StringArg) returns (SimpleStringReply) {
+        option (nrpc.methodSubject) = "mt_simple_reply";
     }
 }
 
 service SvcSubjectParams {
     option (nrpc.serviceSubjectParams) = "clientid";
 
-    rpc MtFullReplyMessage(StringArg) returns (FullReplyMessage) {}
     rpc MtWithSubjectParams(NoArgs) returns (SimpleStringReply) {
         option (nrpc.methodSubjectParams) = "mp1";
         option (nrpc.methodSubjectParams) = "mp2";
@@ -37,18 +35,4 @@ message StringArg {
 
 message SimpleStringReply {
     string reply = 1;
-}
-
-message FullReplyString {
-    oneof reply {
-        string result = 1;
-        nrpc.Error error = 2;
-    }
-}
-
-message FullReplyMessage {
-    oneof reply {
-        SimpleStringReply result = 1;
-        nrpc.Error error = 2;
-    }
 }

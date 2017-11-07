@@ -200,31 +200,6 @@ func getOneofDecl(d *descriptor.DescriptorProto, name string) *descriptor.OneofD
 	return nil
 }
 
-// matchReply checks if a message matches the 'reply' pattern. If so, it returns
-// the 'result' and 'error' fields.
-func matchReply(d *descriptor.DescriptorProto) (result *descriptor.FieldDescriptorProto, err *descriptor.FieldDescriptorProto) {
-	// Must have one and only one 'oneof', and its name must be 'reply'
-	if len(d.GetOneofDecl()) != 1 {
-		return
-	}
-
-	if d.GetOneofDecl()[0].GetName() != "reply" {
-		return
-	}
-	// All fields must be part of the "reply" oneof, and be either result or error
-	for _, field := range d.GetField() {
-		switch field.GetName() {
-		case "result":
-			result = field
-		case "error":
-			err = field
-		default:
-			return nil, nil
-		}
-	}
-	return
-}
-
 func pkgSubject(fd *descriptor.FileDescriptorProto) string {
 	e, err := proto.GetExtension(fd.Options, nrpc.E_PackageSubject)
 	if err == nil {
@@ -237,16 +212,6 @@ func pkgSubject(fd *descriptor.FileDescriptorProto) string {
 func getResultType(
 	md *descriptor.MethodDescriptorProto,
 ) string {
-	_, d := lookupMessageType(md.GetOutputType())
-
-	resultField, _ := matchReply(d)
-
-	if resultField != nil {
-		if resultField.GetTypeName() == "" {
-			return fieldGoType(resultField)
-		}
-		return resultField.GetTypeName()
-	}
 	return md.GetOutputType()
 }
 
@@ -288,11 +253,6 @@ var funcMap = template.FuncMap{
 			for _, md := range sd.GetMethod() {
 				goPkg, _ := getGoType(md.GetInputType())
 				pkgImportName := getPkgImportName(goPkg)
-				if pkgImportName != "" {
-					imports[pkgImportName] = goPkg
-				}
-				goPkg, _ = getGoType(md.GetOutputType())
-				pkgImportName = getPkgImportName(goPkg)
 				if pkgImportName != "" {
 					imports[pkgImportName] = goPkg
 				}
@@ -390,23 +350,7 @@ var funcMap = template.FuncMap{
 	"Prometheus": func() bool {
 		return pluginPrometheus
 	},
-	"HasFullReply": func(
-		md *descriptor.MethodDescriptorProto,
-	) bool {
-		_, d := lookupMessageType(md.GetOutputType())
-		resultField, _ := matchReply(d)
-		return resultField != nil
-	},
 	"GetResultType": getResultType,
-	"HasPointerResultType": func(
-		md *descriptor.MethodDescriptorProto,
-	) bool {
-		_, d := lookupMessageType(md.GetOutputType())
-
-		resultField, _ := matchReply(d)
-
-		return resultField.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE
-	},
 	"GoType": func(pbType string) string {
 		goPkg, goType := getGoType(pbType)
 		if goPkg != "" {
