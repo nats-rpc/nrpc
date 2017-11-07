@@ -32,6 +32,8 @@ extend google.protobuf.ServiceOptions {
 extend google.protobuf.MethodOptions {
     // A custom subject to use instead of (methor name + methodSubjectRule)
     string methodSubject = 52000;
+    // Parameters included in the subject at the method level
+    repeated string methodSubjectParams = 52001;
 }
 
 message Error {

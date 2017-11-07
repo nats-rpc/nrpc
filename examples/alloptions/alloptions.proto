@@ -23,6 +23,10 @@ service SvcSubjectParams {
     option (nrpc.serviceSubjectParams) = "clientid";
 
     rpc MtFullReplyMessage(StringArg) returns (FullReplyMessage) {}
+    rpc MtWithSubjectParams(NoArgs) returns (SimpleStringReply) {
+        option (nrpc.methodSubjectParams) = "mp1";
+        option (nrpc.methodSubjectParams) = "mp2";
+    }
 }
 
 message NoArgs {}

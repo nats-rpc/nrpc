@@ -56,7 +56,7 @@ func ParseSubject(
 	serviceSubject string, serviceParamsCount int,
 	subject string,
 ) (packageParams []string, serviceParams []string,
-	name string, encoding string, err error,
+	name string, tail []string, err error,
 ) {
 	packageSubjectDepth := 0
 	if packageSubject != "" {
@@ -64,13 +64,12 @@ func ParseSubject(
 	}
 	serviceSubjectDepth := strings.Count(serviceSubject, ".") + 1
 	subjectMinSize := packageSubjectDepth + packageParamsCount + serviceSubjectDepth + serviceParamsCount + 1
-	subjectMaxSize := subjectMinSize + 1 // the optional encoding
 
 	tokens := strings.Split(subject, ".")
-	if len(tokens) < subjectMinSize || len(tokens) > subjectMaxSize {
+	if len(tokens) < subjectMinSize {
 		err = fmt.Errorf(
-			"Invalid subject len. Expects number of parts between %d and %d, got %d",
-			subjectMinSize, subjectMaxSize, len(tokens))
+			"Invalid subject len. Expects number of parts >= %d, got %d",
+			subjectMinSize, len(tokens))
 		return
 	}
 	if packageSubject != "" {
@@ -104,11 +103,30 @@ func ParseSubject(
 	name = tokens[0]
 	tokens = tokens[1:]
 
-	switch len(tokens) {
+	tail = tokens
+	return
+}
+
+func ParseSubjectTail(
+	methodParamsCount int,
+	tail []string,
+) (
+	methodParams []string, encoding string, err error,
+) {
+	if len(tail) < methodParamsCount || len(tail) > methodParamsCount+1 {
+		err = fmt.Errorf(
+			"Invalid subject tail length. Expects %d or %d parts, got %d",
+			methodParamsCount, methodParamsCount+1, len(tail),
+		)
+		return
+	}
+	methodParams = tail[:methodParamsCount]
+	tail = tail[methodParamsCount:]
+	switch len(tail) {
 	case 0:
 		encoding = "protobuf"
 	case 1:
-		encoding = tokens[0]
+		encoding = tail[0]
 	default:
 		panic("Got extra tokens, which should be impossible at this point")
 	}
