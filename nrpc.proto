@@ -46,3 +46,5 @@ message Error {
 }
 
 message Void {}
+
+message NoReply {}
