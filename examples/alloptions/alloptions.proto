@@ -26,6 +26,7 @@ service SvcSubjectParams {
         option (nrpc.methodSubjectParams) = "mp1";
         option (nrpc.methodSubjectParams) = "mp2";
     }
+    rpc MtNoReply(nrpc.Void) returns (nrpc.NoReply) {}
 }
 
 message StringArg {

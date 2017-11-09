@@ -37,10 +37,12 @@ type {{.GetName}}Server interface {
 		{{- if ne .GetInputType ".nrpc.Void" -}}
 		, req {{GoType .GetInputType}}
 		{{- end -}}
-	) (
+	)
+		{{- if ne $resultType ".nrpc.NoReply" }} (
 		{{- if ne $resultType ".nrpc.Void" -}}
 		resp {{GoType $resultType}}, {{end -}}
 		err error)
+		{{- end -}}
 	{{- end}}
 }
 
@@ -125,6 +127,7 @@ func (h *{{.GetName}}Handler) Subject() string {
 
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	var encoding string
+	var noreply bool
 	// extract method name & encoding from subject
 	{{ if ne 0 (len $pkgSubjectParams)}}pkgParams{{else}}_{{end -}},
 	{{- if ne 0 (len (GetServiceSubjectParams .))}} svcParams{{else}} _{{end -}}
@@ -154,6 +157,9 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		{{- if ne 0 (len (GetMethodSubjectParams .))}}
 		var mtParams []string
 		{{- end}}
+		{{- if eq .GetOutputType ".nrpc.NoReply"}}
+		noreply = true
+		{{- end}}
 		{{if eq 0 (len (GetMethodSubjectParams .))}}_{{else}}mtParams{{end}}, encoding, err = nrpc.ParseSubjectTail({{len (GetMethodSubjectParams .)}}, tail)
 		if err != nil {
 			log.Printf("{{.GetName}}Hanlder: {{.GetName}} subject parsing failed: %v", err)
@@ -176,10 +182,14 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
+					{{- if eq .GetOutputType ".nrpc.NoReply" -}}
+					var innerResp nrpc.NoReply
+					{{else}}
 					{{if eq .GetOutputType ".nrpc.Void" -}}
 					var innerResp nrpc.Void
 					{{else}}innerResp, {{end -}}
-					err := h.server.{{.GetName}}(ctx
+					err := {{end -}}
+					h.server.{{.GetName}}(ctx
 					{{- range $i, $p := GetMethodSubjectParams . -}}
 					, mtParams[{{ $i }}]
 					{{- end -}}
@@ -216,8 +226,13 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 	}
 
-	// encode and send response
-	err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, encoding) // error is logged
+
+	if !noreply {
+		// encode and send response
+		err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, encoding) // error is logged
+	} else {
+		err = nil
+	}
 {{- if Prometheus}}
 	if err != nil {
 		serverRequestsFor{{$serviceName}}.WithLabelValues(
@@ -284,7 +299,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	{{- if ne .GetInputType ".nrpc.Void" -}}
 	req {{GoType .GetInputType}}
 	{{- end -}}) (
-		{{- if not (eq $resultType ".nrpc.Void") -}}
+		{{- if not (eq $resultType ".nrpc.Void" ".nrpc.NoReply") -}}
 		resp {{GoType $resultType}}, {{end -}}
 		err error) {
 {{- if Prometheus}}
@@ -305,7 +320,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	{{- if eq .GetInputType ".nrpc.Void"}}
 	var req {{GoType .GetInputType}}
 	{{- end}}
-	{{- if eq .GetOutputType ".nrpc.Void"}}
+	{{- if eq .GetOutputType ".nrpc.Void" ".nrpc.NoReply"}}
 	var resp {{GoType .GetOutputType}}
 	{{- end}}
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)

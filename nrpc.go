@@ -187,6 +187,13 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 	}
 
 	// call
+	if _, noreply := rep.(*NoReply); noreply {
+		err := nc.Publish(subject, rawRequest)
+		if err != nil {
+			log.Printf("nrpc: nats publish failed: %v", err)
+		}
+		return err
+	}
 	msg, err := nc.Request(subject, rawRequest, timeout)
 	if err != nil {
 		log.Printf("nrpc: nats request failed: %v", err)

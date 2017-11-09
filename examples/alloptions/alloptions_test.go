@@ -33,6 +33,9 @@ func (s BasicServerImpl) MtVoidReply(
 	return nil
 }
 
+func (s BasicServerImpl) MtNoReply(ctx context.Context) {
+}
+
 func (s BasicServerImpl) MtWithSubjectParams(
 	ctx context.Context, mp1 string, mp2 string,
 ) (
@@ -111,5 +114,10 @@ func TestBasicCalls(t *testing.T) {
 		}
 	} else {
 		t.Errorf("Expected a nrpc.Error, got %#v", err)
+	}
+
+	err = c2.MtNoReply()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

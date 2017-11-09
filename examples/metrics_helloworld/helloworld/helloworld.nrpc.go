@@ -88,6 +88,7 @@ func (h *GreeterHandler) Subject() string {
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	var encoding string
+	var noreply bool
 	// extract method name & encoding from subject
 	_, _, name, tail, err := nrpc.ParseSubject(
 		"helloworld", 0, "Greeter", 0, msg.Subject)
@@ -144,8 +145,13 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 			"Greeter", encoding, "name_fail").Inc()
 	}
 
-	// encode and send response
-	err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, encoding) // error is logged
+
+	if !noreply {
+		// encode and send response
+		err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, encoding) // error is logged
+	} else {
+		err = nil
+	}
 	if err != nil {
 		serverRequestsForGreeter.WithLabelValues(
 			name, encoding, "sendreply_fail").Inc()
