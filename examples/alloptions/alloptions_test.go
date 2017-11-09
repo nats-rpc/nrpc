@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -21,6 +22,15 @@ func (s BasicServerImpl) MtSimpleReply(
 	}
 	resp.Reply = args.Arg1
 	return
+}
+
+func (s BasicServerImpl) MtVoidReply(
+	ctx context.Context, args StringArg,
+) (err error) {
+	if args.GetArg1() == "please fail" {
+		return errors.New("Error")
+	}
+	return nil
 }
 
 func (s BasicServerImpl) MtWithSubjectParams(
@@ -72,6 +82,15 @@ func TestBasicCalls(t *testing.T) {
 	}
 	if r.GetReply() != "hi" {
 		t.Error("Invalid reply:", r.GetReply())
+	}
+
+	if err := c1.MtVoidReply(StringArg{"hi"}); err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	err = c1.MtVoidReply(StringArg{"please fail"})
+	if err == nil {
+		t.Error("Expected an error")
 	}
 
 	r, err = c2.MtWithSubjectParams("p1", "p2")

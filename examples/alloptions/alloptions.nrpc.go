@@ -16,6 +16,7 @@ import (
 // SvcCustomSubject should implement.
 type SvcCustomSubjectServer interface {
 	MtSimpleReply(ctx context.Context, req StringArg) (resp SimpleStringReply, err error)
+	MtVoidReply(ctx context.Context, req StringArg) (err error)
 }
 
 // SvcCustomSubjectHandler provides a NATS subscription handler that can serve a
@@ -80,6 +81,33 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 				log.Printf("MtSimpleReplyHandler: MtSimpleReply handler failed: %s", replyError.Error())
 			}
 		}
+	case "mtvoidreply":
+		_, encoding, err = nrpc.ParseSubjectTail(0, tail)
+		if err != nil {
+			log.Printf("MtVoidReplyHanlder: MtVoidReply subject parsing failed: %v", err)
+			break
+		}
+		var req StringArg
+		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
+			log.Printf("MtVoidReplyHandler: MtVoidReply request unmarshal failed: %v", err)
+			replyError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
+		} else {
+			resp, replyError = nrpc.CaptureErrors(
+				func()(proto.Message, error){
+					var innerResp nrpc.Void
+					err := h.server.MtVoidReply(ctx, req)
+					if err != nil {
+						return nil, err
+					}
+					return &innerResp, err
+				})
+			if replyError != nil {
+				log.Printf("MtVoidReplyHandler: MtVoidReply handler failed: %s", replyError.Error())
+			}
+		}
 	default:
 		log.Printf("SvcCustomSubjectHandler: unknown name %q", name)
 		replyError = &nrpc.Error{
@@ -121,6 +149,20 @@ func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleString
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mt_simple_reply";
 
 	// call
+	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
+	if err != nil {
+		return // already logged
+	}
+
+	return
+}
+
+func (c *SvcCustomSubjectClient) MtVoidReply(req StringArg) (err error) {
+
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreply";
+
+	// call
+	var resp github_com_rapidloop_nrpc.Void
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged

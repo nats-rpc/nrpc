@@ -37,7 +37,10 @@ type {{.GetName}}Server interface {
 		{{- if ne .GetInputType ".nrpc.Void" -}}
 		, req {{GoType .GetInputType}}
 		{{- end -}}
-	) (resp {{GoType $resultType}}, err error)
+	) (
+		{{- if ne $resultType ".nrpc.Void" -}}
+		resp {{GoType $resultType}}, {{end -}}
+		err error)
 	{{- end}}
 }
 
@@ -173,7 +176,10 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
-					innerResp, err := h.server.{{.GetName}}(ctx
+					{{if eq .GetOutputType ".nrpc.Void" -}}
+					var innerResp nrpc.Void
+					{{else}}innerResp, {{end -}}
+					err := h.server.{{.GetName}}(ctx
 					{{- range $i, $p := GetMethodSubjectParams . -}}
 					, mtParams[{{ $i }}]
 					{{- end -}}
@@ -277,7 +283,10 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	{{ . }} string, {{ end -}}
 	{{- if ne .GetInputType ".nrpc.Void" -}}
 	req {{GoType .GetInputType}}
-	{{- end -}}) (resp {{GoType $resultType}}, err error) {
+	{{- end -}}) (
+		{{- if not (eq $resultType ".nrpc.Void") -}}
+		resp {{GoType $resultType}}, {{end -}}
+		err error) {
 {{- if Prometheus}}
 	start := time.Now()
 {{- end}}
@@ -295,6 +304,9 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	// call
 	{{- if eq .GetInputType ".nrpc.Void"}}
 	var req {{GoType .GetInputType}}
+	{{- end}}
+	{{- if eq .GetOutputType ".nrpc.Void"}}
+	var resp {{GoType .GetOutputType}}
 	{{- end}}
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
