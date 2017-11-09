@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/go-nats"
+	github_com_rapidloop_nrpc "github.com/rapidloop/nrpc"
 	"github.com/rapidloop/nrpc"
 )
 
@@ -130,7 +131,7 @@ func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleString
 // SvcSubjectParamsServer is the interface that providers of the service
 // SvcSubjectParams should implement.
 type SvcSubjectParamsServer interface {
-	MtWithSubjectParams(ctx context.Context, mp1 string, mp2 string, req NoArgs) (resp SimpleStringReply, err error)
+	MtWithSubjectParams(ctx context.Context, mp1 string, mp2 string) (resp SimpleStringReply, err error)
 }
 
 // SvcSubjectParamsHandler provides a NATS subscription handler that can serve a
@@ -177,7 +178,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtWithSubjectParamsHanlder: MtWithSubjectParams subject parsing failed: %v", err)
 			break
 		}
-		var req NoArgs
+		var req github_com_rapidloop_nrpc.Void
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("MtWithSubjectParamsHandler: MtWithSubjectParams request unmarshal failed: %v", err)
 			replyError = &nrpc.Error{
@@ -187,7 +188,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 		} else {
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
-					innerResp, err := h.server.MtWithSubjectParams(ctx, mtParams[0], mtParams[1], req)
+					innerResp, err := h.server.MtWithSubjectParams(ctx, mtParams[0], mtParams[1])
 					if err != nil {
 						return nil, err
 					}
@@ -235,11 +236,12 @@ func NewSvcSubjectParamsClient(nc nrpc.NatsConn, pkgParaminstance string, svcPar
 }
 
 
-func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string, req NoArgs) (resp SimpleStringReply, err error) {
+func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string, ) (resp SimpleStringReply, err error) {
 
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtwithsubjectparams" + "." + mp1 + "." + mp2;
 
 	// call
+	var req github_com_rapidloop_nrpc.Void
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged

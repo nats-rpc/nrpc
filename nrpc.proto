@@ -45,4 +45,4 @@ message Error {
 	string message = 2;
 }
 
-message Void{}
+message Void {}

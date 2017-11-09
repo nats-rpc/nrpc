@@ -24,7 +24,7 @@ func (s BasicServerImpl) MtSimpleReply(
 }
 
 func (s BasicServerImpl) MtWithSubjectParams(
-	ctx context.Context, mp1 string, mp2 string, req NoArgs,
+	ctx context.Context, mp1 string, mp2 string,
 ) (
 	resp SimpleStringReply, err error,
 ) {
@@ -74,7 +74,7 @@ func TestBasicCalls(t *testing.T) {
 		t.Error("Invalid reply:", r.GetReply())
 	}
 
-	r, err = c2.MtWithSubjectParams("p1", "p2", NoArgs{})
+	r, err = c2.MtWithSubjectParams("p1", "p2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestBasicCalls(t *testing.T) {
 		t.Error("Invalid reply:", r.GetReply())
 	}
 
-	r, err = c2.MtWithSubjectParams("invalid", "p2", NoArgs{})
+	r, err = c2.MtWithSubjectParams("invalid", "p2")
 	if err == nil {
 		t.Error("Expected an error")
 	}

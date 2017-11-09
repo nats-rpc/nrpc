@@ -21,13 +21,11 @@ service SvcCustomSubject {
 service SvcSubjectParams {
     option (nrpc.serviceSubjectParams) = "clientid";
 
-    rpc MtWithSubjectParams(NoArgs) returns (SimpleStringReply) {
+    rpc MtWithSubjectParams(nrpc.Void) returns (SimpleStringReply) {
         option (nrpc.methodSubjectParams) = "mp1";
         option (nrpc.methodSubjectParams) = "mp2";
     }
 }
-
-message NoArgs {}
 
 message StringArg {
     string arg1 = 1;
