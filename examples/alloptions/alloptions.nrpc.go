@@ -15,7 +15,6 @@ import (
 // SvcCustomSubject should implement.
 type SvcCustomSubjectServer interface {
 	MtSimpleReply(ctx context.Context, req StringArg) (resp SimpleStringReply, err error)
-	MtFullReplyString(ctx context.Context, req StringArg) (resp string, err error)
 }
 
 // SvcCustomSubjectHandler provides a NATS subscription handler that can serve a
@@ -54,7 +53,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 	var resp proto.Message
 	var replyError *nrpc.Error
 	switch name {
-	case "mtsimplereply":
+	case "mt_simple_reply":
 		_, encoding, err = nrpc.ParseSubjectTail(0, tail)
 		if err != nil {
 			log.Printf("MtSimpleReplyHanlder: MtSimpleReply subject parsing failed: %v", err)
@@ -78,36 +77,6 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 				})
 			if replyError != nil {
 				log.Printf("MtSimpleReplyHandler: MtSimpleReply handler failed: %s", replyError.Error())
-			}
-		}
-	case "mt_full_reply_string":
-		_, encoding, err = nrpc.ParseSubjectTail(0, tail)
-		if err != nil {
-			log.Printf("MtFullReplyStringHanlder: MtFullReplyString subject parsing failed: %v", err)
-			break
-		}
-		var req StringArg
-		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
-			log.Printf("MtFullReplyStringHandler: MtFullReplyString request unmarshal failed: %v", err)
-			replyError = &nrpc.Error{
-				Type: nrpc.Error_CLIENT,
-				Message: "bad request received: " + err.Error(),
-			}
-		} else {
-			resp, replyError = nrpc.CaptureErrors(
-				func()(proto.Message, error){
-					result, err := h.server.MtFullReplyString(ctx, req)
-					if err != nil {
-						return nil, err
-					}
-					return &FullReplyString{
-						&FullReplyString_Result{
-							Result: result,
-						},
-					}, err
-				})
-			if replyError != nil {
-				log.Printf("MtFullReplyStringHandler: MtFullReplyString handler failed: %s", replyError.Error())
 			}
 		}
 	default:
@@ -148,7 +117,7 @@ func NewSvcCustomSubjectClient(nc nrpc.NatsConn, pkgParaminstance string) *SvcCu
 
 func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleStringReply, err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtsimplereply";
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mt_simple_reply";
 
 	// call
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
@@ -158,25 +127,9 @@ func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleString
 
 	return
 }
-
-func (c *SvcCustomSubjectClient) MtFullReplyString(req StringArg) (resp string, err error) {
-
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mt_full_reply_string";
-
-	// call
-	var reply FullReplyString
-	err = nrpc.Call(&req, &reply, c.nc, subject, c.Encoding, c.Timeout)
-	if err != nil {
-		return // already logged
-	}
-	resp = reply.GetResult()
-
-	return
-}
 // SvcSubjectParamsServer is the interface that providers of the service
 // SvcSubjectParams should implement.
 type SvcSubjectParamsServer interface {
-	MtFullReplyMessage(ctx context.Context, req StringArg) (resp SimpleStringReply, err error)
 	MtWithSubjectParams(ctx context.Context, mp1 string, mp2 string, req NoArgs) (resp SimpleStringReply, err error)
 }
 
@@ -217,36 +170,6 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 	var resp proto.Message
 	var replyError *nrpc.Error
 	switch name {
-	case "mtfullreplymessage":
-		_, encoding, err = nrpc.ParseSubjectTail(0, tail)
-		if err != nil {
-			log.Printf("MtFullReplyMessageHanlder: MtFullReplyMessage subject parsing failed: %v", err)
-			break
-		}
-		var req StringArg
-		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
-			log.Printf("MtFullReplyMessageHandler: MtFullReplyMessage request unmarshal failed: %v", err)
-			replyError = &nrpc.Error{
-				Type: nrpc.Error_CLIENT,
-				Message: "bad request received: " + err.Error(),
-			}
-		} else {
-			resp, replyError = nrpc.CaptureErrors(
-				func()(proto.Message, error){
-					result, err := h.server.MtFullReplyMessage(ctx, req)
-					if err != nil {
-						return nil, err
-					}
-					return &FullReplyMessage{
-						&FullReplyMessage_Result{
-							Result: &result,
-						},
-					}, err
-				})
-			if replyError != nil {
-				log.Printf("MtFullReplyMessageHandler: MtFullReplyMessage handler failed: %s", replyError.Error())
-			}
-		}
 	case "mtwithsubjectparams":
 		var mtParams []string
 		mtParams, encoding, err = nrpc.ParseSubjectTail(2, tail)
@@ -311,21 +234,6 @@ func NewSvcSubjectParamsClient(nc nrpc.NatsConn, pkgParaminstance string, svcPar
 	}
 }
 
-
-func (c *SvcSubjectParamsClient) MtFullReplyMessage(req StringArg) (resp SimpleStringReply, err error) {
-
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtfullreplymessage";
-
-	// call
-	var reply FullReplyMessage
-	err = nrpc.Call(&req, &reply, c.nc, subject, c.Encoding, c.Timeout)
-	if err != nil {
-		return // already logged
-	}
-	resp = *reply.GetResult()
-
-	return
-}
 
 func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string, req NoArgs) (resp SimpleStringReply, err error) {
 

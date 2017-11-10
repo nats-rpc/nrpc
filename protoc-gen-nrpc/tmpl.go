@@ -168,24 +168,6 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- if Prometheus}}
 			start := time.Now()
 {{- end}}
-			{{- if HasFullReply . }}
-			resp, replyError = nrpc.CaptureErrors(
-				func()(proto.Message, error){
-					result, err := h.server.{{.GetName}}(ctx
-					{{- range $i, $p := GetMethodSubjectParams . -}}
-					, mtParams[{{ $i }}]
-					{{- end -}}
-					, req)
-					if err != nil {
-						return nil, err
-					}
-					return &{{ GoType .GetOutputType }}{
-						&{{ GoType .GetOutputType }}_Result{
-							Result: {{if HasPointerResultType .}}&{{end}}result,
-						},
-					}, err
-				})
-			{{- else}}
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
 					innerResp, err := h.server.{{.GetName}}(ctx
@@ -198,7 +180,6 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 					}
 					return &innerResp, err
 				})
-			{{- end}}
 {{- if Prometheus}}
 			elapsed = time.Since(start).Seconds()
 {{- end}}
@@ -304,12 +285,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	;
 
 	// call
-	{{- if HasFullReply .}}
-	var reply {{GoType .GetOutputType}}
-	err = nrpc.Call(&req, &reply, c.nc, subject, c.Encoding, c.Timeout)
-	{{- else}}
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
-	{{- end}}
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(
@@ -317,10 +293,6 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 {{- end}}
 		return // already logged
 	}
-
-	{{- if HasFullReply .}}
-	resp = {{if HasPointerResultType .}}*{{end}}reply.GetResult()
-	{{- end}}
 
 {{- if Prometheus}}
 

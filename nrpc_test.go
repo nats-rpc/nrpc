@@ -85,96 +85,6 @@ func TestDecode(t *testing.T) {
 	}
 }
 
-func TestReply(t *testing.T) {
-	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer nc.Close()
-
-	subn, err := nc.Subscribe("foo", func(m *nats.Msg) {
-		var (
-			dm DummyMessage
-		)
-		if err := nrpc.Unmarshal("protobuf", m.Data, &dm); err != nil {
-			t.Fatal(err)
-		}
-		var dr DummyReply
-		if dm.Foobar == "Hi" {
-			dr.Reply = &DummyReply_Foobar{
-				Foobar: dm.Foobar,
-			}
-		} else {
-			dr.Reply = &DummyReply_Error{
-				Error: &nrpc.Error{
-					Type:    nrpc.Error_CLIENT,
-					Message: "You did not say Hi",
-				},
-			}
-		}
-		if err := nrpc.Publish(&dr, nil, nc, m.Reply, "protobuf"); err != nil {
-			t.Fatal(err)
-		}
-	})
-	defer subn.Unsubscribe()
-
-	t.Run("Publish", func(t *testing.T) {
-
-		data, err := nrpc.Marshal("protobuf", &DummyMessage{"Hi"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		reply, err := nc.Request("foo", data, 5*time.Second)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var dr DummyReply
-		if err := nrpc.Unmarshal("protobuf", reply.Data, &dr); err != nil {
-			t.Fatal(err)
-		}
-		if dr.GetError() != nil {
-			t.Fatal("Got error:", dr.GetError())
-		}
-		if dr.GetFoobar() != "Hi" {
-			t.Fatal("Shoud receive 'Hi', got", dr.GetFoobar())
-		}
-	})
-
-	t.Run("Call", func(t *testing.T) {
-		var (
-			dm = DummyMessage{"Hi"}
-			dr DummyReply
-		)
-		if err := nrpc.Call(&dm, &dr, nc, "foo", "protobuf", 5*time.Second); err != nil {
-			t.Fatal(err)
-		}
-		if dr.GetError() != nil {
-			t.Error("Unexpected error:", dr.GetError())
-		}
-		if dr.GetFoobar() != "Hi" {
-			t.Error("Should get 'Hi', got", dr.GetFoobar())
-		}
-	})
-
-	t.Run("Call with Error", func(t *testing.T) {
-		var (
-			dm = DummyMessage{"Not Hi"}
-			dr DummyReply
-		)
-		err := nrpc.Call(&dm, &dr, nc, "foo", "protobuf", 5*time.Second)
-		if err == nil {
-			t.Fatal("Should be an error, got none")
-		}
-		e, isError := err.(*nrpc.Error)
-		if !isError {
-			t.Fatal("err should be a *nrpc.Error, but is", e)
-		}
-		if e.GetMessage() != "You did not say Hi" {
-			t.Error("Error message should be 'You did not say Hi', got", e.GetMessage())
-		}
-	})
-}
-
 func TestError(t *testing.T) {
 	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
 	if err != nil {
@@ -266,8 +176,52 @@ func TestUnmarshal(t *testing.T) {
 			}
 			if msg != encodingTestMsg {
 				t.Errorf(
-					"Json decode failed. Expected %#v, got %#v",
-					encodingTestMsg, msg)
+					"%s decode failed. Expected %#v, got %#v",
+					tt.encoding, encodingTestMsg, msg)
+			}
+		})
+	}
+}
+
+func TestMarshalUnmarshalResponse(t *testing.T) {
+	for _, tt := range encodingTests {
+		t.Run("UnmarshalResponse"+tt.encoding, func(t *testing.T) {
+			var msg DummyMessage
+			err := nrpc.UnmarshalResponse(tt.encoding, tt.data, &msg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if msg != encodingTestMsg {
+				t.Errorf(
+					"%s decode failed. Expected %#v, got %#v",
+					tt.encoding, encodingTestMsg, msg)
+			}
+		})
+		t.Run("MarshalErrorResponse"+tt.encoding, func(t *testing.T) {
+			data, err := nrpc.MarshalErrorResponse(tt.encoding, &nrpc.Error{
+				Type: nrpc.Error_CLIENT, Message: "Some error",
+			})
+			if err != nil {
+				t.Fatal("Unexpected error:", err)
+			}
+			switch tt.encoding {
+			case "protobuf":
+				if data[0] != 0 {
+					t.Error("Expects payload to start with a '0', got", data[0])
+				}
+			case "json":
+				if string(data[:13]) != "{\"__error__\":" {
+					t.Error("Expects payload to start with '{\"__error__\":', got", string(data[:13]))
+				}
+			}
+			var msg DummyMessage
+			err = nrpc.UnmarshalResponse(tt.encoding, data, &msg)
+			repErr, ok := err.(*nrpc.Error)
+			if !ok {
+				t.Errorf("Expected a nrpc.Error, got %#v", err)
+			}
+			if repErr.Type != nrpc.Error_CLIENT || repErr.Message != "Some error" {
+				t.Errorf("Unexpected err: %#v", *repErr)
 			}
 		})
 	}

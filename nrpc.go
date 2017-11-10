@@ -1,6 +1,7 @@
 package nrpc
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,11 +15,6 @@ import (
 )
 
 //go:generate protoc --go_out=../../.. nrpc.proto
-
-type Reply interface {
-	proto.Message
-	GetError() *Error
-}
 
 type NatsConn interface {
 	Request(subj string, data []byte, timeout time.Duration) (*nats.Msg, error)
@@ -40,12 +36,57 @@ func Unmarshal(encoding string, data []byte, msg proto.Message) error {
 	}
 }
 
+func UnmarshalResponse(encoding string, data []byte, msg proto.Message) error {
+	switch encoding {
+	case "protobuf":
+		if data[0] == 0 {
+			var repErr Error
+			if err := proto.Unmarshal(data[1:], &repErr); err != nil {
+				return err
+			}
+			return &repErr
+		}
+		return proto.Unmarshal(data, msg)
+	case "json":
+		if bytes.Equal(data[:13], []byte("{\"__error__\":")) {
+			var rep map[string]*Error
+			if err := json.Unmarshal(data, &rep); err != nil {
+				return err
+			}
+			return rep["__error__"]
+		}
+		return json.Unmarshal(data, msg)
+	default:
+		return errors.New("Invalid encoding: " + encoding)
+	}
+}
+
 func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 	switch encoding {
 	case "protobuf":
 		return proto.Marshal(msg)
 	case "json":
 		return json.Marshal(msg)
+	default:
+		return nil, errors.New("Invalid encoding: " + encoding)
+	}
+}
+
+func MarshalErrorResponse(encoding string, repErr *Error) ([]byte, error) {
+	switch encoding {
+	case "protobuf":
+		var (
+			buf  = []byte{0}
+			pBuf = proto.NewBuffer(buf)
+		)
+		if err := pBuf.Marshal(repErr); err != nil {
+			return nil, err
+		}
+		return pBuf.Bytes(), nil
+	case "json":
+		return json.Marshal(map[string]*Error{
+			"__error__": repErr,
+		})
 	default:
 		return nil, errors.New("Invalid encoding: " + encoding)
 	}
@@ -154,63 +195,26 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 
 	data := msg.Data
 
-	// If the reply type is not a Reply implementation, if will be encapsulated
-	// in a RPCResponse
-	if _, ok := rep.(Reply); !ok {
-		var response RPCResponse
-		if err = Unmarshal(encoding, data, &response); err != nil {
+	if err := UnmarshalResponse(encoding, data, rep); err != nil {
+		if _, isError := err.(*Error); !isError {
 			log.Printf("nrpc: response unmarshal failed: %v", err)
-			return err
 		}
-		if response.GetError() != nil {
-			return response.GetError()
-		}
-		data = response.GetResult()
-	}
-
-	// decode rpc reponse
-	if err := Unmarshal(encoding, data, rep); err != nil {
-		log.Printf("nrpc: response unmarshal failed: %v", err)
 		return err
-	}
-
-	if reply, ok := rep.(Reply); ok && reply.GetError() != nil {
-		return reply.GetError()
 	}
 
 	return nil
 }
 
 func Publish(resp proto.Message, withError *Error, nc NatsConn, subject string, encoding string) error {
-	if _, ok := resp.(Reply); !ok {
-		// wrap the response in a RPCResponse
-		if withError == nil { // send any inner object only if error is unset
-			inner, err := Marshal(encoding, resp)
-			if err != nil {
-				log.Printf("nrpc: inner response marshal failed: %v", err)
-				// Don't return here. Send back a response to the caller.
-				withError = &Error{
-					Type:    Error_SERVER,
-					Message: "nrpc: inner response marshal failed server-side",
-				}
-			} else {
-				resp = &RPCResponse{
-					Reply: &RPCResponse_Result{
-						Result: inner,
-					},
-				}
-			}
-		}
-		if withError != nil {
-			resp = &RPCResponse{
-				Reply: &RPCResponse_Error{
-					Error: withError,
-				},
-			}
-		}
+	var rawResponse []byte
+	var err error
+
+	if withError != nil {
+		rawResponse, err = MarshalErrorResponse(encoding, withError)
+	} else {
+		rawResponse, err = Marshal(encoding, resp)
 	}
 
-	rawResponse, err := Marshal(encoding, resp)
 	if err != nil {
 		log.Printf("nrpc: rpc response marshal failed: %v", err)
 		return err

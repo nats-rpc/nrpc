@@ -14,7 +14,7 @@ import (
 // GreeterServer is the interface that providers of the service
 // Greeter should implement.
 type GreeterServer interface {
-	SayHello(ctx context.Context, req HelloRequest) (resp string, err error)
+	SayHello(ctx context.Context, req HelloRequest) (resp HelloReply, err error)
 }
 
 // GreeterHandler provides a NATS subscription handler that can serve a
@@ -68,15 +68,11 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 		} else {
 			resp, replyError = nrpc.CaptureErrors(
 				func()(proto.Message, error){
-					result, err := h.server.SayHello(ctx, req)
+					innerResp, err := h.server.SayHello(ctx, req)
 					if err != nil {
 						return nil, err
 					}
-					return &HelloReply{
-						&HelloReply_Result{
-							Result: result,
-						},
-					}, err
+					return &innerResp, err
 				})
 			if replyError != nil {
 				log.Printf("SayHelloHandler: SayHello handler failed: %s", replyError.Error())
@@ -116,17 +112,15 @@ func NewGreeterClient(nc nrpc.NatsConn) *GreeterClient {
 }
 
 
-func (c *GreeterClient) SayHello(req HelloRequest) (resp string, err error) {
+func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 
 	subject := c.PkgSubject + "." + c.Subject + "." + "SayHello";
 
 	// call
-	var reply HelloReply
-	err = nrpc.Call(&req, &reply, c.nc, subject, c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
 	}
-	resp = reply.GetResult()
 
 	return
 }

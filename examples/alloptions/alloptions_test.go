@@ -23,22 +23,6 @@ func (s BasicServerImpl) MtSimpleReply(
 	return
 }
 
-func (BasicServerImpl) MtFullReplyString(
-	ctx context.Context, args StringArg,
-) (resp string, err error) {
-	return args.Arg1, nil
-}
-
-func (s BasicServerImpl) MtFullReplyMessage(
-	ctx context.Context, args StringArg,
-) (resp SimpleStringReply, err error) {
-	if ctx.Value("nrpc-svc-clientid").(string) != "me" {
-		s.t.Error("Got an invalid nrpc-svc-clientid:", ctx.Value("nrpc-svc-clientid"))
-	}
-	resp.Reply = args.Arg1
-	return
-}
-
 func (s BasicServerImpl) MtWithSubjectParams(
 	ctx context.Context, mp1 string, mp2 string, req NoArgs,
 ) (
@@ -83,22 +67,6 @@ func TestBasicCalls(t *testing.T) {
 	c2 := NewSvcSubjectParamsClient(c, "default", "me")
 
 	r, err := c1.MtSimpleReply(StringArg{"hi"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if r.GetReply() != "hi" {
-		t.Error("Invalid reply:", r.GetReply())
-	}
-
-	sreply, err := c1.MtFullReplyString(StringArg{"hi"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sreply != "hi" {
-		t.Error("Invalid reply:", sreply)
-	}
-
-	r, err = c2.MtFullReplyMessage(StringArg{"hi"})
 	if err != nil {
 		t.Fatal(err)
 	}
