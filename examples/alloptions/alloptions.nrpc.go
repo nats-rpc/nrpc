@@ -39,6 +39,16 @@ func (h *SvcCustomSubjectHandler) Subject() string {
 	return "root.*.custom_subject.>"
 }
 
+func (h *SvcCustomSubjectHandler) MtNoRequestPublish(pkginstance string, msg SimpleStringReply) error {
+	rawMsg, err := nrpc.Marshal("protobuf", &msg)
+	if err != nil {
+		log.Printf("SvcCustomSubjectHandler.MtNoRequestPublish: error marshaling the message: %s", err)
+		return err
+	}
+	subject := "root." + pkginstance + "."+ "custom_subject."+ "mtnorequest"
+	return h.nc.Publish(subject, rawMsg)
+}
+
 func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 	var encoding string
 	var noreply bool
@@ -162,7 +172,6 @@ func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleString
 
 	return
 }
-
 func (c *SvcCustomSubjectClient) MtVoidReply(req StringArg) (err error) {
 
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreply";
@@ -176,6 +185,51 @@ func (c *SvcCustomSubjectClient) MtVoidReply(req StringArg) (err error) {
 
 	return
 }
+type MtNoRequestSubscription struct {
+	*nats.Subscription
+}
+
+func (s *MtNoRequestSubscription) Next(timeout time.Duration) (next SimpleStringReply, err error) {
+	msg, err := s.Subscription.NextMsg(timeout)
+	if err != nil {
+		return
+	}
+	err = nrpc.Unmarshal("protobuf", msg.Data, &next)
+	return
+}
+
+func (c *SvcCustomSubjectClient) MtNoRequestSubscribeSync() (sub *MtNoRequestSubscription, err error) {
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtnorequest"
+	natsSub, err := c.nc.SubscribeSync(subject)
+	if err != nil {
+		return
+	}
+	sub = &MtNoRequestSubscription{natsSub}
+	return
+}
+
+func (c *SvcCustomSubjectClient) MtNoRequestSubscribe(handler func (SimpleStringReply)) (sub *nats.Subscription, err error) {
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtnorequest"
+	sub, err = c.nc.Subscribe(subject, func(msg *nats.Msg){
+		var pmsg SimpleStringReply
+		err := nrpc.Unmarshal("protobuf", msg.Data, &pmsg)
+		if err != nil {
+			log.Printf("SvcCustomSubjectClient.MtNoRequestSubscribe: Error decoding, %s", err)
+			return
+		}
+		handler(pmsg)
+	})
+	return
+}
+
+func (c *SvcCustomSubjectClient) MtNoRequestSubscribeChan() (<-chan SimpleStringReply, *nats.Subscription, error) {
+	ch := make(chan SimpleStringReply)
+	sub, err := c.MtNoRequestSubscribe(func (msg SimpleStringReply) {
+		ch <- msg
+	})
+	return ch, sub, err
+}
+
 // SvcSubjectParamsServer is the interface that providers of the service
 // SvcSubjectParams should implement.
 type SvcSubjectParamsServer interface {
@@ -331,7 +385,6 @@ func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string, ) (
 
 	return
 }
-
 func (c *SvcSubjectParamsClient) MtNoReply() (err error) {
 
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtnoreply";

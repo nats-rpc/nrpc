@@ -17,6 +17,7 @@ service SvcCustomSubject {
         option (nrpc.methodSubject) = "mt_simple_reply";
     }
     rpc MtVoidReply(StringArg) returns (nrpc.Void) {}
+    rpc MtNoRequest(nrpc.NoRequest) returns (SimpleStringReply) {}
 }
 
 service SvcSubjectParams {

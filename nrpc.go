@@ -19,6 +19,8 @@ import (
 type NatsConn interface {
 	Request(subj string, data []byte, timeout time.Duration) (*nats.Msg, error)
 	Publish(subj string, data []byte) error
+	Subscribe(subj string, handler nats.MsgHandler) (*nats.Subscription, error)
+	SubscribeSync(subj string) (*nats.Subscription, error)
 }
 
 func (e *Error) Error() string {
