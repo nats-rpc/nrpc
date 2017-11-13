@@ -47,4 +47,5 @@ message Error {
 
 message Void {}
 
+message NoRequest {}
 message NoReply {}
