@@ -30,6 +30,10 @@ service SvcSubjectParams {
     rpc MtNoReply(nrpc.Void) returns (nrpc.NoReply) {}
 }
 
+service NoRequestService {
+    rpc MtNoRequest(nrpc.NoRequest) returns (SimpleStringReply) {}
+}
+
 message StringArg {
     string arg1 = 1;
 }

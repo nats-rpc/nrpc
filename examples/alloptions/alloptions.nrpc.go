@@ -48,7 +48,6 @@ func (h *SvcCustomSubjectHandler) MtNoRequestPublish(pkginstance string, msg Sim
 	subject := "root." + pkginstance + "."+ "custom_subject."+ "mtnorequest"
 	return h.nc.Publish(subject, rawMsg)
 }
-
 func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 	var encoding string
 	var noreply bool
@@ -185,11 +184,11 @@ func (c *SvcCustomSubjectClient) MtVoidReply(req StringArg) (err error) {
 
 	return
 }
-type MtNoRequestSubscription struct {
+type SvcCustomSubjectMtNoRequestSubscription struct {
 	*nats.Subscription
 }
 
-func (s *MtNoRequestSubscription) Next(timeout time.Duration) (next SimpleStringReply, err error) {
+func (s *SvcCustomSubjectMtNoRequestSubscription) Next(timeout time.Duration) (next SimpleStringReply, err error) {
 	msg, err := s.Subscription.NextMsg(timeout)
 	if err != nil {
 		return
@@ -198,13 +197,13 @@ func (s *MtNoRequestSubscription) Next(timeout time.Duration) (next SimpleString
 	return
 }
 
-func (c *SvcCustomSubjectClient) MtNoRequestSubscribeSync() (sub *MtNoRequestSubscription, err error) {
+func (c *SvcCustomSubjectClient) MtNoRequestSubscribeSync() (sub *SvcCustomSubjectMtNoRequestSubscription, err error) {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtnorequest"
 	natsSub, err := c.nc.SubscribeSync(subject)
 	if err != nil {
 		return
 	}
-	sub = &MtNoRequestSubscription{natsSub}
+	sub = &SvcCustomSubjectMtNoRequestSubscription{natsSub}
 	return
 }
 
@@ -398,4 +397,104 @@ func (c *SvcSubjectParamsClient) MtNoReply() (err error) {
 	}
 
 	return
+}// NoRequestServiceServer is the interface that providers of the service
+// NoRequestService should implement.
+type NoRequestServiceServer interface {
 }
+
+// NoRequestServiceHandler provides a NATS subscription handler that can serve a
+// subscription using a given NoRequestServiceServer implementation.
+type NoRequestServiceHandler struct {
+	ctx    context.Context
+	nc     nrpc.NatsConn
+	server NoRequestServiceServer
+}
+
+func NewNoRequestServiceHandler(ctx context.Context, nc nrpc.NatsConn, s NoRequestServiceServer) *NoRequestServiceHandler {
+	return &NoRequestServiceHandler{
+		ctx:    ctx,
+		nc:     nc,
+		server: s,
+	}
+}
+
+func (h *NoRequestServiceHandler) Subject() string {
+	return "root.*.norequestservice.>"
+}
+
+func (h *NoRequestServiceHandler) MtNoRequestPublish(pkginstance string, msg SimpleStringReply) error {
+	rawMsg, err := nrpc.Marshal("protobuf", &msg)
+	if err != nil {
+		log.Printf("NoRequestServiceHandler.MtNoRequestPublish: error marshaling the message: %s", err)
+		return err
+	}
+	subject := "root." + pkginstance + "."+ "norequestservice."+ "mtnorequest"
+	return h.nc.Publish(subject, rawMsg)
+}
+
+type NoRequestServiceClient struct {
+	nc      nrpc.NatsConn
+	PkgSubject string
+	PkgParaminstance string
+	Subject string
+	Encoding string
+	Timeout time.Duration
+}
+
+func NewNoRequestServiceClient(nc nrpc.NatsConn, pkgParaminstance string) *NoRequestServiceClient {
+	return &NoRequestServiceClient{
+		nc:      nc,
+		PkgSubject: "root",
+		PkgParaminstance: pkgParaminstance,
+		Subject: "norequestservice",
+		Encoding: "protobuf",
+		Timeout: 5 * time.Second,
+	}
+}
+
+
+type NoRequestServiceMtNoRequestSubscription struct {
+	*nats.Subscription
+}
+
+func (s *NoRequestServiceMtNoRequestSubscription) Next(timeout time.Duration) (next SimpleStringReply, err error) {
+	msg, err := s.Subscription.NextMsg(timeout)
+	if err != nil {
+		return
+	}
+	err = nrpc.Unmarshal("protobuf", msg.Data, &next)
+	return
+}
+
+func (c *NoRequestServiceClient) MtNoRequestSubscribeSync() (sub *NoRequestServiceMtNoRequestSubscription, err error) {
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtnorequest"
+	natsSub, err := c.nc.SubscribeSync(subject)
+	if err != nil {
+		return
+	}
+	sub = &NoRequestServiceMtNoRequestSubscription{natsSub}
+	return
+}
+
+func (c *NoRequestServiceClient) MtNoRequestSubscribe(handler func (SimpleStringReply)) (sub *nats.Subscription, err error) {
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtnorequest"
+	sub, err = c.nc.Subscribe(subject, func(msg *nats.Msg){
+		var pmsg SimpleStringReply
+		err := nrpc.Unmarshal("protobuf", msg.Data, &pmsg)
+		if err != nil {
+			log.Printf("NoRequestServiceClient.MtNoRequestSubscribe: Error decoding, %s", err)
+			return
+		}
+		handler(pmsg)
+	})
+	return
+}
+
+func (c *NoRequestServiceClient) MtNoRequestSubscribeChan() (<-chan SimpleStringReply, *nats.Subscription, error) {
+	ch := make(chan SimpleStringReply)
+	sub, err := c.MtNoRequestSubscribe(func (msg SimpleStringReply) {
+		ch <- msg
+	})
+	return ch, sub, err
+}
+

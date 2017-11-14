@@ -126,13 +126,11 @@ func (h *{{.GetName}}Handler) Subject() string {
 	{{- end -}}
 	.>"
 }
-
-{{- $serviceName := .GetName}}
+{{$serviceName := .GetName}}
 {{- $serviceSubject := GetServiceSubject .}}
 {{- $serviceSubjectParams := GetServiceSubjectParams .}}
 {{- range .Method}}
 {{- if eq .GetInputType ".nrpc.NoRequest"}}
-
 func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 	{{- range $pkgSubjectParams}}pkg{{.}} string, {{end -}}
 	{{- range $serviceSubjectParams}}svc{{.}} string, {{end -}}
@@ -152,6 +150,7 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 {{- end}}
 {{- end}}
 
+{{- if ServiceNeedsHandler .}}
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	var encoding string
 	var noreply bool
@@ -279,6 +278,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	}
 {{- end}}
 }
+{{- end}}
 
 type {{.GetName}}Client struct {
 	nc      nrpc.NatsConn
@@ -374,11 +374,11 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	return
 }
 {{- else}}
-type {{.GetName}}Subscription struct {
+type {{$serviceName}}{{.GetName}}Subscription struct {
 	*nats.Subscription
 }
 
-func (s *{{.GetName}}Subscription) Next(timeout time.Duration) (next {{GoType .GetOutputType}}, err error) {
+func (s *{{$serviceName}}{{.GetName}}Subscription) Next(timeout time.Duration) (next {{GoType .GetOutputType}}, err error) {
 	msg, err := s.Subscription.NextMsg(timeout)
 	if err != nil {
 		return
@@ -387,7 +387,7 @@ func (s *{{.GetName}}Subscription) Next(timeout time.Duration) (next {{GoType .G
 	return
 }
 
-func (c *{{$serviceName}}Client) {{.GetName}}SubscribeSync() (sub *{{.GetName}}Subscription, err error) {
+func (c *{{$serviceName}}Client) {{.GetName}}SubscribeSync() (sub *{{$serviceName}}{{.GetName}}Subscription, err error) {
 	subject := {{ if ne 0 (len $pkgSubject) -}}
 		c.PkgSubject + "." + {{end}}
 	{{- range $pkgSubjectParams -}}
@@ -399,7 +399,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}SubscribeSync() (sub *{{.GetName}}S
 	if err != nil {
 		return
 	}
-	sub = &{{.GetName}}Subscription{natsSub}
+	sub = &{{$serviceName}}{{.GetName}}Subscription{natsSub}
 	return
 }
 
