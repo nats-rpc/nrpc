@@ -39,7 +39,7 @@ func Unmarshal(encoding string, data []byte, msg proto.Message) error {
 func UnmarshalResponse(encoding string, data []byte, msg proto.Message) error {
 	switch encoding {
 	case "protobuf":
-		if data[0] == 0 {
+		if len(data) > 0 && data[0] == 0 {
 			var repErr Error
 			if err := proto.Unmarshal(data[1:], &repErr); err != nil {
 				return err
@@ -48,7 +48,7 @@ func UnmarshalResponse(encoding string, data []byte, msg proto.Message) error {
 		}
 		return proto.Unmarshal(data, msg)
 	case "json":
-		if bytes.Equal(data[:13], []byte("{\"__error__\":")) {
+		if len(data) > 13 && bytes.Equal(data[:13], []byte("{\"__error__\":")) {
 			var rep map[string]*Error
 			if err := json.Unmarshal(data, &rep); err != nil {
 				return err
@@ -187,6 +187,13 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 	}
 
 	// call
+	if _, noreply := rep.(*NoReply); noreply {
+		err := nc.Publish(subject, rawRequest)
+		if err != nil {
+			log.Printf("nrpc: nats publish failed: %v", err)
+		}
+		return err
+	}
 	msg, err := nc.Request(subject, rawRequest, timeout)
 	if err != nil {
 		log.Printf("nrpc: nats request failed: %v", err)

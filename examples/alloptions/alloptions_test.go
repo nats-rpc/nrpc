@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -23,8 +24,20 @@ func (s BasicServerImpl) MtSimpleReply(
 	return
 }
 
+func (s BasicServerImpl) MtVoidReply(
+	ctx context.Context, args StringArg,
+) (err error) {
+	if args.GetArg1() == "please fail" {
+		return errors.New("Error")
+	}
+	return nil
+}
+
+func (s BasicServerImpl) MtNoReply(ctx context.Context) {
+}
+
 func (s BasicServerImpl) MtWithSubjectParams(
-	ctx context.Context, mp1 string, mp2 string, req NoArgs,
+	ctx context.Context, mp1 string, mp2 string,
 ) (
 	resp SimpleStringReply, err error,
 ) {
@@ -74,7 +87,16 @@ func TestBasicCalls(t *testing.T) {
 		t.Error("Invalid reply:", r.GetReply())
 	}
 
-	r, err = c2.MtWithSubjectParams("p1", "p2", NoArgs{})
+	if err := c1.MtVoidReply(StringArg{"hi"}); err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	err = c1.MtVoidReply(StringArg{"please fail"})
+	if err == nil {
+		t.Error("Expected an error")
+	}
+
+	r, err = c2.MtWithSubjectParams("p1", "p2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +104,7 @@ func TestBasicCalls(t *testing.T) {
 		t.Error("Invalid reply:", r.GetReply())
 	}
 
-	r, err = c2.MtWithSubjectParams("invalid", "p2", NoArgs{})
+	r, err = c2.MtWithSubjectParams("invalid", "p2")
 	if err == nil {
 		t.Error("Expected an error")
 	}
@@ -92,5 +114,10 @@ func TestBasicCalls(t *testing.T) {
 		}
 	} else {
 		t.Errorf("Expected a nrpc.Error, got %#v", err)
+	}
+
+	err = c2.MtNoReply()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

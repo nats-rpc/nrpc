@@ -16,18 +16,18 @@ service SvcCustomSubject {
     rpc MtSimpleReply(StringArg) returns (SimpleStringReply) {
         option (nrpc.methodSubject) = "mt_simple_reply";
     }
+    rpc MtVoidReply(StringArg) returns (nrpc.Void) {}
 }
 
 service SvcSubjectParams {
     option (nrpc.serviceSubjectParams) = "clientid";
 
-    rpc MtWithSubjectParams(NoArgs) returns (SimpleStringReply) {
+    rpc MtWithSubjectParams(nrpc.Void) returns (SimpleStringReply) {
         option (nrpc.methodSubjectParams) = "mp1";
         option (nrpc.methodSubjectParams) = "mp2";
     }
+    rpc MtNoReply(nrpc.Void) returns (nrpc.NoReply) {}
 }
-
-message NoArgs {}
 
 message StringArg {
     string arg1 = 1;

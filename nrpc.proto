@@ -44,3 +44,7 @@ message Error {
     Type type = 1;
 	string message = 2;
 }
+
+message Void {}
+
+message NoReply {}
