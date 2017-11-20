@@ -12,8 +12,9 @@ import (
 )
 
 type BasicServerImpl struct {
-	t       *testing.T
-	handler *SvcCustomSubjectHandler
+	t        *testing.T
+	handler  *SvcCustomSubjectHandler
+	handler2 *SvcSubjectParamsHandler
 }
 
 func (s BasicServerImpl) MtSimpleReply(
@@ -38,6 +39,7 @@ func (s BasicServerImpl) MtVoidReply(
 func (s BasicServerImpl) MtNoReply(ctx context.Context) {
 	s.t.Log("Will publish to MtNoRequest")
 	s.handler.MtNoRequestPublish("default", SimpleStringReply{"Hi there"})
+	s.handler2.MtNoRequestWParamsPublish("default", "me", "mtvalue", SimpleStringReply{"Hi there"})
 }
 
 func (s BasicServerImpl) MtWithSubjectParams(
@@ -60,8 +62,10 @@ func TestBasicCalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler1 := NewSvcCustomSubjectHandler(context.Background(), c, BasicServerImpl{t, nil})
-	handler2 := NewSvcSubjectParamsHandler(context.Background(), c, BasicServerImpl{t, handler1})
+	handler1 := NewSvcCustomSubjectHandler(context.Background(), c, BasicServerImpl{t, nil, nil})
+	impl := BasicServerImpl{t, handler1, nil}
+	handler2 := NewSvcSubjectParamsHandler(context.Background(), c, &impl)
+	impl.handler2 = handler2
 
 	if handler1.Subject() != "root.*.custom_subject.>" {
 		t.Fatal("Invalid subject", handler1.Subject())
@@ -120,6 +124,23 @@ func TestBasicCalls(t *testing.T) {
 		t.Errorf("Expected a nrpc.Error, got %#v", err)
 	}
 
+	t.Run("NoRequest method with params", func(t *testing.T) {
+		sub, err := c2.MtNoRequestWParamsSubscribeSync(
+			"mtvalue",
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer sub.Unsubscribe()
+		c2.MtNoReply()
+		reply, err := sub.Next(time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reply.GetReply() != "Hi there" {
+			t.Errorf("Expected 'Hi there', got %s", reply.GetReply())
+		}
+	})
 	t.Run("NoRequest method subscriptions", func(t *testing.T) {
 		fmt.Println("Subscribing")
 		sub1, err := c1.MtNoRequestSubscribeSync()

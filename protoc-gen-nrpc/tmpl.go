@@ -134,6 +134,7 @@ func (h *{{.GetName}}Handler) Subject() string {
 func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 	{{- range $pkgSubjectParams}}pkg{{.}} string, {{end -}}
 	{{- range $serviceSubjectParams}}svc{{.}} string, {{end -}}
+	{{- range GetMethodSubjectParams .}}mt{{.}} string, {{end -}}
 	msg {{GoType .GetOutputType}}) error {
 	rawMsg, err := nrpc.Marshal("protobuf", &msg)
 	if err != nil {
@@ -145,6 +146,7 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 	+ "{{$serviceSubject}}."
 	{{- range $serviceSubjectParams}} + svc{{.}} + "."{{end -}}
 	+ "{{GetMethodSubject .}}"
+	{{- range GetMethodSubjectParams .}} + "." + mt{{.}}{{end}}
 	return h.nc.Publish(subject, rawMsg)
 }
 {{- end}}
@@ -374,6 +376,20 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	return
 }
 {{- else}}
+
+func (c *{{$serviceName}}Client) {{.GetName}}Subject(
+	{{range GetMethodSubjectParams .}}mt{{.}} string,{{end}}
+) string {
+	return {{ if ne 0 (len $pkgSubject) -}}
+		c.PkgSubject + "." + {{end}}
+	{{- range $pkgSubjectParams -}}
+	    c.PkgParam{{.}} + "." + {{end -}}
+	c.Subject + "." + {{range $serviceSubjectParams -}}
+	    c.SvcParam{{.}} + "." + {{end -}}
+	"{{GetMethodSubject .}}"
+	{{- range GetMethodSubjectParams .}} + "." + mt{{.}}{{end}}
+}
+
 type {{$serviceName}}{{.GetName}}Subscription struct {
 	*nats.Subscription
 }
@@ -387,14 +403,12 @@ func (s *{{$serviceName}}{{.GetName}}Subscription) Next(timeout time.Duration) (
 	return
 }
 
-func (c *{{$serviceName}}Client) {{.GetName}}SubscribeSync() (sub *{{$serviceName}}{{.GetName}}Subscription, err error) {
-	subject := {{ if ne 0 (len $pkgSubject) -}}
-		c.PkgSubject + "." + {{end}}
-	{{- range $pkgSubjectParams -}}
-	    c.PkgParam{{.}} + "." + {{end -}}
-	c.Subject + "." + {{range $serviceSubjectParams -}}
-	    c.SvcParam{{.}} + "." + {{end -}}
-	"{{GetMethodSubject .}}"
+func (c *{{$serviceName}}Client) {{.GetName}}SubscribeSync(
+	{{range GetMethodSubjectParams .}}mt{{.}} string,{{end}}
+) (sub *{{$serviceName}}{{.GetName}}Subscription, err error) {
+	subject := c.{{.GetName}}Subject(
+		{{range GetMethodSubjectParams .}}mt{{.}},{{end}}
+	)
 	natsSub, err := c.nc.SubscribeSync(subject)
 	if err != nil {
 		return
@@ -403,14 +417,13 @@ func (c *{{$serviceName}}Client) {{.GetName}}SubscribeSync() (sub *{{$serviceNam
 	return
 }
 
-func (c *{{$serviceName}}Client) {{.GetName}}Subscribe(handler func ({{GoType .GetOutputType}})) (sub *nats.Subscription, err error) {
-	subject := {{ if ne 0 (len $pkgSubject) -}}
-		c.PkgSubject + "." + {{end}}
-	{{- range $pkgSubjectParams -}}
-	    c.PkgParam{{.}} + "." + {{end -}}
-	c.Subject + "." + {{range $serviceSubjectParams -}}
-	    c.SvcParam{{.}} + "." + {{end -}}
-	"{{GetMethodSubject .}}"
+func (c *{{$serviceName}}Client) {{.GetName}}Subscribe(
+	{{range GetMethodSubjectParams .}}mt{{.}} string,{{end}}
+	handler func ({{GoType .GetOutputType}}),
+) (sub *nats.Subscription, err error) {
+	subject := c.{{.GetName}}Subject(
+		{{range GetMethodSubjectParams .}}mt{{.}},{{end}}
+	)
 	sub, err = c.nc.Subscribe(subject, func(msg *nats.Msg){
 		var pmsg {{GoType .GetOutputType}}
 		err := nrpc.Unmarshal("protobuf", msg.Data, &pmsg)
@@ -423,9 +436,13 @@ func (c *{{$serviceName}}Client) {{.GetName}}Subscribe(handler func ({{GoType .G
 	return
 }
 
-func (c *{{$serviceName}}Client) {{.GetName}}SubscribeChan() (<-chan {{GoType .GetOutputType}}, *nats.Subscription, error) {
+func (c *{{$serviceName}}Client) {{.GetName}}SubscribeChan(
+	{{range GetMethodSubjectParams .}}mt{{.}} string,{{end}}
+) (<-chan {{GoType .GetOutputType}}, *nats.Subscription, error) {
 	ch := make(chan {{GoType .GetOutputType}})
-	sub, err := c.{{.GetName}}Subscribe(func (msg {{GoType .GetOutputType}}) {
+	sub, err := c.{{.GetName}}Subscribe(
+		{{- range GetMethodSubjectParams .}}mt{{.}}, {{end -}}
+		func (msg {{GoType .GetOutputType}}) {
 		ch <- msg
 	})
 	return ch, sub, err
