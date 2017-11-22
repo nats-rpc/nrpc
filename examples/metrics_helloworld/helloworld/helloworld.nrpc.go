@@ -204,6 +204,38 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 
 	return
 }
+type Client struct {
+	nc      nrpc.NatsConn
+	defaultEncoding string
+	defaultTimeout time.Duration
+	pkgSubject string
+	Greeter *GreeterClient
+}
+
+func NewClient(nc nrpc.NatsConn) *Client {
+	c := Client{
+		nc: nc,
+		defaultEncoding: "protobuf",
+		defaultTimeout: 5*time.Second,
+		pkgSubject: "helloworld",
+	};
+	c.Greeter = NewGreeterClient(nc)
+	return &c
+}
+
+func (c *Client) SetEncoding(encoding string) {
+	c.defaultEncoding = encoding
+	if c.Greeter != nil {
+		c.Greeter.Encoding = encoding
+	}
+}
+
+func (c *Client) SetTimeout(t time.Duration) {
+	c.defaultTimeout = t
+	if c.Greeter != nil {
+		c.Greeter.Timeout = t
+	}
+}
 
 func init() {
 	// register metrics for service Greeter

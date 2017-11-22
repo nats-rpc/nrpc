@@ -607,3 +607,78 @@ func (c *NoRequestServiceClient) MtNoRequestSubscribeChan(
 	return ch, sub, err
 }
 
+
+type Client struct {
+	nc      nrpc.NatsConn
+	defaultEncoding string
+	defaultTimeout time.Duration
+	pkgSubject string
+	pkgParaminstance string
+	SvcCustomSubject *SvcCustomSubjectClient
+	SvcSubjectParams *SvcSubjectParamsClient
+	NoRequestService *NoRequestServiceClient
+}
+
+func NewClient(nc nrpc.NatsConn, pkgParaminstance string) *Client {
+	c := Client{
+		nc: nc,
+		defaultEncoding: "protobuf",
+		defaultTimeout: 5*time.Second,
+		pkgSubject: "root",
+		pkgParaminstance: pkgParaminstance,
+	};
+	c.SvcCustomSubject = NewSvcCustomSubjectClient(nc, c.pkgParaminstance)
+	c.NoRequestService = NewNoRequestServiceClient(nc, c.pkgParaminstance)
+	return &c
+}
+
+func (c *Client) SetEncoding(encoding string) {
+	c.defaultEncoding = encoding
+	if c.SvcCustomSubject != nil {
+		c.SvcCustomSubject.Encoding = encoding
+	}
+	if c.SvcSubjectParams != nil {
+		c.SvcSubjectParams.Encoding = encoding
+	}
+	if c.NoRequestService != nil {
+		c.NoRequestService.Encoding = encoding
+	}
+}
+
+func (c *Client) SetTimeout(t time.Duration) {
+	c.defaultTimeout = t
+	if c.SvcCustomSubject != nil {
+		c.SvcCustomSubject.Timeout = t
+	}
+	if c.SvcSubjectParams != nil {
+		c.SvcSubjectParams.Timeout = t
+	}
+	if c.NoRequestService != nil {
+		c.NoRequestService.Timeout = t
+	}
+}
+
+func (c *Client) SetSvcSubjectParamsParams(
+	clientid string,
+) {
+	c.SvcSubjectParams = NewSvcSubjectParamsClient(
+		c.nc,
+		c.pkgParaminstance,
+		clientid,
+	)
+	c.SvcSubjectParams.Encoding = c.defaultEncoding
+	c.SvcSubjectParams.Timeout = c.defaultTimeout
+}
+
+func (c *Client) NewSvcSubjectParams(
+	clientid string,
+) *SvcSubjectParamsClient {
+	client := NewSvcSubjectParamsClient(
+		c.nc,
+		c.pkgParaminstance,
+		clientid,
+	)
+	client.Encoding = c.defaultEncoding
+	client.Timeout = c.defaultTimeout
+	return client
+}
