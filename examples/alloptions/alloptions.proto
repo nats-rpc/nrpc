@@ -17,6 +17,7 @@ service SvcCustomSubject {
         option (nrpc.methodSubject) = "mt_simple_reply";
     }
     rpc MtVoidReply(StringArg) returns (nrpc.Void) {}
+    rpc MtNoRequest(nrpc.NoRequest) returns (SimpleStringReply) {}
 }
 
 service SvcSubjectParams {
@@ -27,6 +28,13 @@ service SvcSubjectParams {
         option (nrpc.methodSubjectParams) = "mp2";
     }
     rpc MtNoReply(nrpc.Void) returns (nrpc.NoReply) {}
+    rpc MtNoRequestWParams(nrpc.NoRequest) returns (SimpleStringReply) {
+        option (nrpc.methodSubjectParams) = "mp1";
+    }
+}
+
+service NoRequestService {
+    rpc MtNoRequest(nrpc.NoRequest) returns (SimpleStringReply) {}
 }
 
 message StringArg {

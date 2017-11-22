@@ -310,6 +310,14 @@ var funcMap = template.FuncMap{
 		}
 		return sd.GetName()
 	},
+	"ServiceNeedsHandler": func(sd *descriptor.ServiceDescriptorProto) bool {
+		for _, md := range sd.GetMethod() {
+			if md.GetInputType() != ".nrpc.NoRequest" {
+				return true
+			}
+		}
+		return false
+	},
 	"GetMethodSubject": func(md *descriptor.MethodDescriptorProto) string {
 		if opts := md.GetOptions(); opts != nil {
 			s, err := proto.GetExtension(opts, nrpc.E_MethodSubject)

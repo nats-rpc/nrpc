@@ -5,13 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nats-io/go-nats"
 	"github.com/rapidloop/nrpc"
 )
 
 type BasicServerImpl struct {
-	t *testing.T
+	t        *testing.T
+	handler  *SvcCustomSubjectHandler
+	handler2 *SvcSubjectParamsHandler
 }
 
 func (s BasicServerImpl) MtSimpleReply(
@@ -34,6 +37,9 @@ func (s BasicServerImpl) MtVoidReply(
 }
 
 func (s BasicServerImpl) MtNoReply(ctx context.Context) {
+	s.t.Log("Will publish to MtNoRequest")
+	s.handler.MtNoRequestPublish("default", SimpleStringReply{"Hi there"})
+	s.handler2.MtNoRequestWParamsPublish("default", "me", "mtvalue", SimpleStringReply{"Hi there"})
 }
 
 func (s BasicServerImpl) MtWithSubjectParams(
@@ -56,8 +62,10 @@ func TestBasicCalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler1 := NewSvcCustomSubjectHandler(context.Background(), c, BasicServerImpl{t})
-	handler2 := NewSvcSubjectParamsHandler(context.Background(), c, BasicServerImpl{t})
+	handler1 := NewSvcCustomSubjectHandler(context.Background(), c, BasicServerImpl{t, nil, nil})
+	impl := BasicServerImpl{t, handler1, nil}
+	handler2 := NewSvcSubjectParamsHandler(context.Background(), c, &impl)
+	impl.handler2 = handler2
 
 	if handler1.Subject() != "root.*.custom_subject.>" {
 		t.Fatal("Invalid subject", handler1.Subject())
@@ -116,8 +124,68 @@ func TestBasicCalls(t *testing.T) {
 		t.Errorf("Expected a nrpc.Error, got %#v", err)
 	}
 
-	err = c2.MtNoReply()
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("NoRequest method with params", func(t *testing.T) {
+		sub, err := c2.MtNoRequestWParamsSubscribeSync(
+			"mtvalue",
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer sub.Unsubscribe()
+		c2.MtNoReply()
+		reply, err := sub.Next(time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reply.GetReply() != "Hi there" {
+			t.Errorf("Expected 'Hi there', got %s", reply.GetReply())
+		}
+	})
+	t.Run("NoRequest method subscriptions", func(t *testing.T) {
+		fmt.Println("Subscribing")
+		sub1, err := c1.MtNoRequestSubscribeSync()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer sub1.Unsubscribe()
+		repChan := make(chan string, 2)
+		sub2, err := c1.MtNoRequestSubscribe(func(msg SimpleStringReply) {
+			repChan <- msg.GetReply()
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer sub2.Unsubscribe()
+		msgChan, sub3, err := c1.MtNoRequestSubscribeChan()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer sub3.Unsubscribe()
+		go func() {
+			msg := <-msgChan
+			repChan <- msg.GetReply()
+		}()
+
+		err = c2.MtNoReply()
+		if err != nil {
+			t.Fatal(err)
+		}
+		msg, err := sub1.Next(time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if msg.GetReply() != "Hi there" {
+			t.Errorf("Expected 'Hi there', got '%s'", msg.GetReply())
+		}
+		for _ = range []int{0, 1} {
+			select {
+			case rep := <-repChan:
+				if rep != "Hi there" {
+					t.Errorf("Expected 'Hi there', got '%s'", rep)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("timeout")
+			}
+		}
+	})
 }
