@@ -23,7 +23,7 @@ var (
 	clientRCTForGreeter = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name:       "nrpc_client_request_completion_time_seconds",
-			Help:       "The request completion time for Greeter calls, measured client-side.",
+			Help:       "The request completion time for calls, measured client-side.",
 			Objectives: map[float64]float64{0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
 			ConstLabels: map[string]string{
 				"service": "Greeter",
@@ -35,7 +35,7 @@ var (
 	serverHETForGreeter = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name:       "nrpc_server_handler_execution_time_seconds",
-			Help:       "The handler execution time for Greeter calls, measured server-side.",
+			Help:       "The handler execution time for calls, measured server-side.",
 			Objectives: map[float64]float64{0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
 			ConstLabels: map[string]string{
 				"service": "Greeter",
