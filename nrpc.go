@@ -14,13 +14,27 @@ import (
 	nats "github.com/nats-io/go-nats"
 )
 
+// ErrStreamInvalidMsgCount is when a stream reply gets a wrong number of messages
+var ErrStreamInvalidMsgCount = errors.New("Stream reply received an incorrect number of messages")
+
 //go:generate protoc --go_out=../../.. nrpc.proto
 
 type NatsConn interface {
-	Request(subj string, data []byte, timeout time.Duration) (*nats.Msg, error)
 	Publish(subj string, data []byte) error
+	PublishRequest(subj, reply string, data []byte) error
+	Request(subj string, data []byte, timeout time.Duration) (*nats.Msg, error)
+
 	Subscribe(subj string, handler nats.MsgHandler) (*nats.Subscription, error)
 	SubscribeSync(subj string) (*nats.Subscription, error)
+}
+
+// ReplyInboxMaker returns a new inbox subject for a given nats connection.
+type ReplyInboxMaker func(NatsConn) string
+
+// GetReplyInbox is used by StreamCall to get a inbox subject
+// It can be changed by a client lib that needs custom inbox subjects
+var GetReplyInbox ReplyInboxMaker = func(NatsConn) string {
+	return nats.NewInbox()
 }
 
 func (e *Error) Error() string {
@@ -212,6 +226,86 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 	}
 
 	return nil
+}
+
+var ErrEOS = errors.New("End of stream")
+
+type StreamCallSubscription struct {
+	encoding string
+	timeout  time.Duration
+	sub      *nats.Subscription
+	msgCount uint32
+}
+
+func (sub *StreamCallSubscription) Next(rep proto.Message) error {
+	var msg *nats.Msg
+
+	// Receive messages until a non-empty one arrives
+	for {
+		var err error
+		msg, err = sub.sub.NextMsg(sub.timeout)
+		if err != nil {
+			return err
+		}
+		if len(msg.Data) != 0 {
+			break
+		}
+	}
+
+	if err := UnmarshalResponse(sub.encoding, msg.Data, rep); err != nil {
+		if nrpcErr, ok := err.(*Error); ok {
+			if nrpcErr.GetMsgCount() != sub.msgCount {
+				log.Printf(
+					"nrpc: received invalid number of messages. Expected %d, got %d",
+					nrpcErr.GetMsgCount(), sub.msgCount)
+			}
+			if nrpcErr.GetType() == Error_EOS {
+				if nrpcErr.GetMsgCount() != sub.msgCount {
+					sub.sub.Unsubscribe()
+					return ErrStreamInvalidMsgCount
+				}
+				sub.sub.Unsubscribe()
+				return ErrEOS
+			}
+		} else {
+			log.Printf("nrpc: response unmarshal failed: %v", err)
+		}
+		sub.sub.Unsubscribe()
+		return err
+	}
+	sub.msgCount++
+
+	return nil
+}
+
+func StreamCall(nc NatsConn, subject string, req proto.Message, encoding string, timeout time.Duration) (*StreamCallSubscription, error) {
+	rawRequest, err := Marshal(encoding, req)
+	if err != nil {
+		log.Printf("nrpc: inner request marshal failed: %v", err)
+		return nil, err
+	}
+
+	if encoding != "protobuf" {
+		subject += "." + encoding
+	}
+
+	reply := GetReplyInbox(nc)
+
+	sub, err := nc.SubscribeSync(reply)
+	if err != nil {
+		return nil, err
+	}
+	streamSub := StreamCallSubscription{
+		encoding: encoding,
+		timeout:  timeout,
+		sub:      sub,
+	}
+
+	if err := nc.PublishRequest(subject, reply, rawRequest); err != nil {
+		sub.Unsubscribe()
+		return nil, err
+	}
+	return &streamSub, nil
 }
 
 func Publish(resp proto.Message, withError *Error, nc NatsConn, subject string, encoding string) error {
