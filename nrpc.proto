@@ -42,9 +42,11 @@ message Error {
     enum Type {
         CLIENT = 0;
         SERVER = 1;
+        EOS = 3;
     }
     Type type = 1;
     string message = 2;
+    uint32 msgCount = 3;
 }
 
 message Void {}
