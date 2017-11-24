@@ -117,7 +117,6 @@ func NewGreeterClient(nc nrpc.NatsConn) *GreeterClient {
 	}
 }
 
-
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 
 	subject := c.PkgSubject + "." + c.Subject + "." + "SayHello";
@@ -130,6 +129,7 @@ func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) 
 
 	return
 }
+
 type Client struct {
 	nc      nrpc.NatsConn
 	defaultEncoding string

@@ -356,3 +356,43 @@ func CaptureErrors(fn func() (proto.Message, error)) (msg proto.Message, replyEr
 	}
 	return
 }
+
+func NewKeepStreamAlive(nc NatsConn, subject string, onError func()) *KeepStreamAlive {
+	k := KeepStreamAlive{
+		nc:      nc,
+		subject: subject,
+		c:       make(chan struct{}),
+		onError: onError,
+	}
+	go k.loop()
+	return &k
+}
+
+type KeepStreamAlive struct {
+	nc      NatsConn
+	subject string
+	c       chan struct{}
+	onError func()
+}
+
+func (k *KeepStreamAlive) Stop() {
+	close(k.c)
+}
+
+func (k *KeepStreamAlive) loop() {
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			if err := k.nc.Publish(k.subject, nil); err != nil {
+				log.Printf("nrpc: error publishing response")
+				ticker.Stop()
+				k.onError()
+				return
+			}
+		case <-k.c:
+			ticker.Stop()
+			return
+		}
+	}
+}

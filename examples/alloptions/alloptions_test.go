@@ -36,6 +36,22 @@ func (s BasicServerImpl) MtVoidReply(
 	return nil
 }
 
+func (s BasicServerImpl) MtStreamedReply(
+	ctx context.Context, req StringArg, reply func(rep SimpleStringReply),
+) error {
+	if req.GetArg1() == "please fail" {
+		panic("Failing")
+	}
+	time.Sleep(2 * time.Second)
+	reply(SimpleStringReply{"msg1"})
+	time.Sleep(250 * time.Millisecond)
+	reply(SimpleStringReply{"msg2"})
+	time.Sleep(250 * time.Millisecond)
+	reply(SimpleStringReply{"msg3"})
+	time.Sleep(250 * time.Millisecond)
+	return nil
+}
+
 func (s BasicServerImpl) MtNoReply(ctx context.Context) {
 	s.t.Log("Will publish to MtNoRequest")
 	s.handler.MtNoRequestPublish("default", SimpleStringReply{"Hi there"})
@@ -103,6 +119,37 @@ func TestBasicCalls(t *testing.T) {
 	if err == nil {
 		t.Error("Expected an error")
 	}
+
+	t.Run("StreamedReply", func(t *testing.T) {
+		var resList []string
+		err := c1.MtStreamedReply(
+			context.Background(),
+			StringArg{"arg"},
+			func(ctx context.Context, rep SimpleStringReply) {
+				resList = append(resList, rep.GetReply())
+			})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resList[0] != "msg1" {
+			t.Errorf("Expected 'msg1', got '%s'", resList[0])
+		}
+		if resList[1] != "msg2" {
+			t.Errorf("Expected 'msg2', got '%s'", resList[1])
+		}
+		if resList[2] != "msg3" {
+			t.Errorf("Expected 'msg3', got '%s'", resList[2])
+		}
+
+		err = c1.MtStreamedReply(context.Background(),
+			StringArg{"please fail"},
+			func(ctx context.Context, rep SimpleStringReply) {
+				t.Fatal("Should not receive anything")
+			})
+		if err == nil {
+			t.Fatal("Expected an error, got nil")
+		}
+	})
 
 	r, err = c2.MtWithSubjectParams("p1", "p2")
 	if err != nil {
