@@ -64,7 +64,7 @@ func (h *SvcCustomSubjectHandler) MtStreamedReplyHandler(ctx context.Context, ta
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	keepStreamAlive := nrpc.NewKeepStreamAlive(h.nc, msg.Reply, cancel)
+	keepStreamAlive := nrpc.NewKeepStreamAlive(h.nc, msg.Reply, encoding, cancel)
 
 	var msgCount uint32
 

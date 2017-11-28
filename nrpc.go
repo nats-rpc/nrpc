@@ -24,6 +24,7 @@ type NatsConn interface {
 	PublishRequest(subj, reply string, data []byte) error
 	Request(subj string, data []byte, timeout time.Duration) (*nats.Msg, error)
 
+	ChanSubscribe(subj string, ch chan *nats.Msg) (*nats.Subscription, error)
 	Subscribe(subj string, handler nats.MsgHandler) (*nats.Subscription, error)
 	SubscribeSync(subj string) (*nats.Subscription, error)
 }
@@ -357,22 +358,24 @@ func CaptureErrors(fn func() (proto.Message, error)) (msg proto.Message, replyEr
 	return
 }
 
-func NewKeepStreamAlive(nc NatsConn, subject string, onError func()) *KeepStreamAlive {
+func NewKeepStreamAlive(nc NatsConn, subject string, encoding string, onError func()) *KeepStreamAlive {
 	k := KeepStreamAlive{
-		nc:      nc,
-		subject: subject,
-		c:       make(chan struct{}),
-		onError: onError,
+		nc:       nc,
+		subject:  subject,
+		encoding: encoding,
+		c:        make(chan struct{}),
+		onError:  onError,
 	}
 	go k.loop()
 	return &k
 }
 
 type KeepStreamAlive struct {
-	nc      NatsConn
-	subject string
-	c       chan struct{}
-	onError func()
+	nc       NatsConn
+	subject  string
+	encoding string
+	c        chan struct{}
+	onError  func()
 }
 
 func (k *KeepStreamAlive) Stop() {
@@ -380,12 +383,46 @@ func (k *KeepStreamAlive) Stop() {
 }
 
 func (k *KeepStreamAlive) loop() {
+	hbChan := make(chan *nats.Msg)
+	hbSub, err := k.nc.ChanSubscribe(k.subject+".heartbeat", hbChan)
+	if err != nil {
+		log.Printf("nrpc: could not subscribe to heartbeat: %s", err)
+		k.onError()
+	}
+	defer func() {
+		if err := hbSub.Unsubscribe(); err != nil {
+			log.Printf("nrpc: error unsubscribing from heartbeat: %s", err)
+		}
+	}()
+	hbDelay := 0
 	ticker := time.NewTicker(time.Second)
 	for {
 		select {
+		case msg := <-hbChan:
+			var hb HeartBeat
+			if err := Unmarshal(k.encoding, msg.Data, &hb); err != nil {
+				log.Printf("nrpc: error unmarshaling heartbeat: %s", err)
+				ticker.Stop()
+				k.onError()
+				return
+			}
+			if hb.Lastbeat {
+				log.Printf("nrpc: client canceled the streamed reply.")
+				ticker.Stop()
+				k.onError()
+				return
+			}
+			hbDelay = 0
 		case <-ticker.C:
+			hbDelay++
+			if hbDelay >= 5 {
+				log.Printf("nrpc: No heartbeat received in 5 seconds. Canceling.")
+				ticker.Stop()
+				k.onError()
+				return
+			}
 			if err := k.nc.Publish(k.subject, nil); err != nil {
-				log.Printf("nrpc: error publishing response")
+				log.Printf("nrpc: error publishing response: %s", err)
 				ticker.Stop()
 				k.onError()
 				return
