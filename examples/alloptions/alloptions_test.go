@@ -158,14 +158,15 @@ func TestBasicCalls(t *testing.T) {
 			}
 		})
 
-		t.Run("NoHeartBeat", func(t *testing.T) {
-			err = c1.MtStreamedReply(context.Background(),
+		t.Run("Cancel", func(t *testing.T) {
+			ctx, _ := context.WithTimeout(context.Background(), 7*time.Second)
+			err = c1.MtStreamedReply(ctx,
 				StringArg{"very long call"},
 				func(context.Context, SimpleStringReply) {
 					t.Fatal("Should not receive anything")
 				})
-			if err != nats.ErrTimeout {
-				t.Fatal("Expects a timeout error, got ", err)
+			if err != nrpc.ErrCanceled {
+				t.Fatal("Expects a ErrCanceled error, got ", err)
 			}
 		})
 	})

@@ -2,6 +2,7 @@ package nrpc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -230,56 +231,132 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 }
 
 var ErrEOS = errors.New("End of stream")
+var ErrCanceled = errors.New("Call canceled")
+
+func NewStreamCallSubscription(
+	ctx context.Context, nc NatsConn, encoding string, subject string,
+	timeout time.Duration,
+) (*StreamCallSubscription, error) {
+	sub := StreamCallSubscription{
+		ctx:      ctx,
+		nc:       nc,
+		encoding: encoding,
+		subject:  subject,
+		timeout:  timeout,
+		timeoutT: time.NewTimer(timeout),
+		subCh:    make(chan *nats.Msg, 256),
+		nextCh:   make(chan *nats.Msg),
+		quit:     make(chan struct{}),
+		errCh:    make(chan error),
+	}
+	ssub, err := nc.ChanSubscribe(subject, sub.subCh)
+	if err != nil {
+		return nil, err
+	}
+	sub.sub = ssub
+	go sub.loop()
+	return &sub, nil
+}
 
 type StreamCallSubscription struct {
+	ctx      context.Context
+	nc       NatsConn
 	encoding string
+	subject  string
 	timeout  time.Duration
+	timeoutT *time.Timer
 	sub      *nats.Subscription
+	subCh    chan *nats.Msg
+	nextCh   chan *nats.Msg
+	quit     chan struct{}
+	errCh    chan error
 	msgCount uint32
 }
 
-func (sub *StreamCallSubscription) Next(rep proto.Message) error {
-	var msg *nats.Msg
+func (sub *StreamCallSubscription) stop() {
+	close(sub.quit)
+}
 
-	// Receive messages until a non-empty one arrives
+func (sub *StreamCallSubscription) loop() {
+	hbSubject := sub.subject + ".heartbeat"
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	defer sub.sub.Unsubscribe()
 	for {
-		var err error
-		msg, err = sub.sub.NextMsg(sub.timeout)
-		if err != nil {
+		select {
+		case msg := <-sub.subCh:
+			sub.timeoutT.Reset(sub.timeout)
+
+			if len(msg.Data) == 0 {
+				break
+			}
+			sub.nextCh <- msg
+		case <-sub.timeoutT.C:
+			sub.errCh <- nats.ErrTimeout
+			return
+		case <-sub.ctx.Done():
+			// send a 'lastbeat' and quit
+			b, err := Marshal(sub.encoding, &HeartBeat{Lastbeat: true})
+			if err != nil {
+				err = fmt.Errorf("Error marshaling heartbeat: %s", err)
+				sub.errCh <- err
+				return
+			}
+			if err := sub.nc.Publish(hbSubject, b); err != nil {
+				err = fmt.Errorf("Error sending heartbeat: %s", err)
+				sub.errCh <- err
+				return
+			}
+			sub.errCh <- ErrCanceled
+			return
+		case <-ticker.C:
+			if err := sub.nc.Publish(hbSubject, nil); err != nil {
+				err = fmt.Errorf("Error sending heartbeat: %s", err)
+				sub.errCh <- err
+				return
+			}
+		case <-sub.quit:
+			return
+		}
+	}
+}
+
+func (sub *StreamCallSubscription) Next(rep proto.Message) error {
+	if sub.sub == nil {
+		return nats.ErrBadSubscription
+	}
+	select {
+	case err := <-sub.errCh:
+		sub.sub = nil
+		return err
+	case msg := <-sub.nextCh:
+		if err := UnmarshalResponse(sub.encoding, msg.Data, rep); err != nil {
+			sub.stop()
+			sub.sub = nil
+			if nrpcErr, ok := err.(*Error); ok {
+				if nrpcErr.GetMsgCount() != sub.msgCount {
+					log.Printf(
+						"nrpc: received invalid number of messages. Expected %d, got %d",
+						nrpcErr.GetMsgCount(), sub.msgCount)
+				}
+				if nrpcErr.GetType() == Error_EOS {
+					if nrpcErr.GetMsgCount() != sub.msgCount {
+						return ErrStreamInvalidMsgCount
+					}
+					return ErrEOS
+				}
+			} else {
+				log.Printf("nrpc: response unmarshal failed: %v", err)
+			}
 			return err
 		}
-		if len(msg.Data) != 0 {
-			break
-		}
+		sub.msgCount++
 	}
-
-	if err := UnmarshalResponse(sub.encoding, msg.Data, rep); err != nil {
-		if nrpcErr, ok := err.(*Error); ok {
-			if nrpcErr.GetMsgCount() != sub.msgCount {
-				log.Printf(
-					"nrpc: received invalid number of messages. Expected %d, got %d",
-					nrpcErr.GetMsgCount(), sub.msgCount)
-			}
-			if nrpcErr.GetType() == Error_EOS {
-				if nrpcErr.GetMsgCount() != sub.msgCount {
-					sub.sub.Unsubscribe()
-					return ErrStreamInvalidMsgCount
-				}
-				sub.sub.Unsubscribe()
-				return ErrEOS
-			}
-		} else {
-			log.Printf("nrpc: response unmarshal failed: %v", err)
-		}
-		sub.sub.Unsubscribe()
-		return err
-	}
-	sub.msgCount++
 
 	return nil
 }
 
-func StreamCall(nc NatsConn, subject string, req proto.Message, encoding string, timeout time.Duration) (*StreamCallSubscription, error) {
+func StreamCall(ctx context.Context, nc NatsConn, subject string, req proto.Message, encoding string, timeout time.Duration) (*StreamCallSubscription, error) {
 	rawRequest, err := Marshal(encoding, req)
 	if err != nil {
 		log.Printf("nrpc: inner request marshal failed: %v", err)
@@ -292,21 +369,16 @@ func StreamCall(nc NatsConn, subject string, req proto.Message, encoding string,
 
 	reply := GetReplyInbox(nc)
 
-	sub, err := nc.SubscribeSync(reply)
+	streamSub, err := NewStreamCallSubscription(ctx, nc, encoding, reply, timeout)
 	if err != nil {
 		return nil, err
 	}
-	streamSub := StreamCallSubscription{
-		encoding: encoding,
-		timeout:  timeout,
-		sub:      sub,
-	}
 
 	if err := nc.PublishRequest(subject, reply, rawRequest); err != nil {
-		sub.Unsubscribe()
+		streamSub.stop()
 		return nil, err
 	}
-	return &streamSub, nil
+	return streamSub, nil
 }
 
 func Publish(resp proto.Message, withError *Error, nc NatsConn, subject string, encoding string) error {
@@ -383,7 +455,7 @@ func (k *KeepStreamAlive) Stop() {
 }
 
 func (k *KeepStreamAlive) loop() {
-	hbChan := make(chan *nats.Msg)
+	hbChan := make(chan *nats.Msg, 256)
 	hbSub, err := k.nc.ChanSubscribe(k.subject+".heartbeat", hbChan)
 	if err != nil {
 		log.Printf("nrpc: could not subscribe to heartbeat: %s", err)

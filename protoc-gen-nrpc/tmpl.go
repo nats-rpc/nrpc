@@ -480,7 +480,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	{{- range GetMethodSubjectParams . }} + "." + {{ . }}{{ end -}}
 	;
 
-	sub, err := nrpc.StreamCall(c.nc, subject, &req, c.Encoding, c.Timeout)
+	sub, err := nrpc.StreamCall(ctx, c.nc, subject, &req, c.Encoding, c.Timeout)
 	if err != nil {
 		{{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(

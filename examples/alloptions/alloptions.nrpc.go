@@ -302,7 +302,7 @@ func (c *SvcCustomSubjectClient) MtStreamedReply(
 ) error {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtstreamedreply";
 
-	sub, err := nrpc.StreamCall(c.nc, subject, &req, c.Encoding, c.Timeout)
+	sub, err := nrpc.StreamCall(ctx, c.nc, subject, &req, c.Encoding, c.Timeout)
 	if err != nil {
 		return err
 	}

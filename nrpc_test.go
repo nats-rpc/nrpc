@@ -2,7 +2,9 @@ package nrpc_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 	"time"
@@ -109,6 +111,7 @@ func TestStreamCall(t *testing.T) {
 				t.Fatal(err)
 			}
 			time.Sleep(60 * time.Millisecond)
+			log.Print("Sending 'world'")
 			// Send a second message
 			if err := nrpc.Publish(
 				&DummyMessage{"world"},
@@ -117,6 +120,7 @@ func TestStreamCall(t *testing.T) {
 			); err != nil {
 				t.Fatal(err)
 			}
+			log.Print("Sending EOF")
 			// Send the EOS marker
 			if err := nrpc.Publish(
 				nil,
@@ -132,7 +136,7 @@ func TestStreamCall(t *testing.T) {
 		defer subn.Unsubscribe()
 
 		sub, err := nrpc.StreamCall(
-			nc, "foo.*", &DummyMessage{}, "protobuf", 100*time.Millisecond)
+			context.TODO(), nc, "foo.*", &DummyMessage{}, "protobuf", 100*time.Millisecond)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -179,7 +183,7 @@ func TestStreamCall(t *testing.T) {
 		defer subn.Unsubscribe()
 
 		sub, err := nrpc.StreamCall(
-			nc, "foo.*", &DummyMessage{}, "protobuf", 100*time.Millisecond)
+			context.TODO(), nc, "foo.*", &DummyMessage{}, "protobuf", 100*time.Millisecond)
 		if err != nil {
 			t.Fatal(err)
 		}
