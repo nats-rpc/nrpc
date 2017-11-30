@@ -287,9 +287,10 @@ func (sub *StreamCallSubscription) loop() {
 		case msg := <-sub.subCh:
 			sub.timeoutT.Reset(sub.timeout)
 
-			if len(msg.Data) == 0 {
+			if len(msg.Data) == 1 && msg.Data[0] == 0 {
 				break
 			}
+
 			sub.nextCh <- msg
 		case <-sub.timeoutT.C:
 			sub.errCh <- nats.ErrTimeout
@@ -494,7 +495,7 @@ func (k *KeepStreamAlive) loop() {
 				k.onError()
 				return
 			}
-			if err := k.nc.Publish(k.subject, nil); err != nil {
+			if err := k.nc.Publish(k.subject, []byte{0}); err != nil {
 				log.Printf("nrpc: error publishing response: %s", err)
 				ticker.Stop()
 				k.onError()

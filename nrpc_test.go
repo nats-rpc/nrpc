@@ -98,7 +98,7 @@ func TestStreamCall(t *testing.T) {
 		subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
 			time.Sleep(60 * time.Millisecond)
 			// Send an empty message
-			if err := nc.Publish(m.Reply, nil); err != nil {
+			if err := nc.Publish(m.Reply, []byte{0}); err != nil {
 				t.Fatal(err)
 			}
 			time.Sleep(60 * time.Millisecond)
