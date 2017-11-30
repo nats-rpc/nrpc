@@ -163,11 +163,13 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail 
 		log.Printf("{{$serviceName}}: {{.GetName}} subject parsing failed:")
 	}
 
+	{{- if ne .GetInputType ".nrpc.Void"}}
 	var req {{GoType .GetInputType}}
 	if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 		// Handle error
 		return
 	}
+	{{- end}}
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -180,7 +182,10 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail 
 		{{- range GetMethodSubjectParams . -}}
 		, {{.}}
 		{{- end -}}
-		, req, func(rep {{GoType .GetOutputType}}){
+		{{- if ne .GetInputType ".nrpc.Void" -}}
+		, req
+		{{- end -}}
+		, func(rep {{GoType .GetOutputType}}){
 				if err = nrpc.Publish(&rep, nil, h.nc, msg.Reply, encoding); err != nil {
 					log.Printf("nrpc: error publishing response")
 					cancel()
@@ -480,7 +485,13 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	{{- range GetMethodSubjectParams . }} + "." + {{ . }}{{ end -}}
 	;
 
-	sub, err := nrpc.StreamCall(ctx, c.nc, subject, &req, c.Encoding, c.Timeout)
+	sub, err := nrpc.StreamCall(ctx, c.nc, subject
+		{{- if ne .GetInputType ".nrpc.Void" -}}
+		, &req
+		{{- else -}}
+		, &nrpc.Void{}
+		{{- end -}}
+		, c.Encoding, c.Timeout)
 	if err != nil {
 		{{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(

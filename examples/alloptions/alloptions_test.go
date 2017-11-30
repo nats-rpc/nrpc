@@ -37,22 +37,35 @@ func (s BasicServerImpl) MtVoidReply(
 }
 
 func (s BasicServerImpl) MtStreamedReply(
-	ctx context.Context, req StringArg, reply func(rep SimpleStringReply),
+	ctx context.Context, req StringArg, send func(rep SimpleStringReply),
 ) error {
 	if req.GetArg1() == "please fail" {
 		panic("Failing")
 	}
 	if req.GetArg1() == "very long call" {
-		time.Sleep(time.Minute)
-		return nil
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Minute):
+			time.Sleep(time.Minute)
+			return nil
+		}
 	}
 	time.Sleep(2 * time.Second)
-	reply(SimpleStringReply{"msg1"})
+	send(SimpleStringReply{"msg1"})
 	time.Sleep(250 * time.Millisecond)
-	reply(SimpleStringReply{"msg2"})
+	send(SimpleStringReply{"msg2"})
 	time.Sleep(250 * time.Millisecond)
-	reply(SimpleStringReply{"msg3"})
+	send(SimpleStringReply{"msg3"})
 	time.Sleep(250 * time.Millisecond)
+	return nil
+}
+
+func (s BasicServerImpl) MtVoidReqStreamedReply(
+	ctx context.Context, send func(rep SimpleStringReply),
+) error {
+	time.Sleep(2 * time.Second)
+	send(SimpleStringReply{"hi"})
 	return nil
 }
 
@@ -148,7 +161,7 @@ func TestBasicCalls(t *testing.T) {
 		})
 
 		t.Run("Error", func(t *testing.T) {
-			err = c1.MtStreamedReply(context.Background(),
+			err := c1.MtStreamedReply(context.Background(),
 				StringArg{"please fail"},
 				func(ctx context.Context, rep SimpleStringReply) {
 					t.Fatal("Should not receive anything")
@@ -160,13 +173,22 @@ func TestBasicCalls(t *testing.T) {
 
 		t.Run("Cancel", func(t *testing.T) {
 			ctx, _ := context.WithTimeout(context.Background(), 7*time.Second)
-			err = c1.MtStreamedReply(ctx,
+			err := c1.MtStreamedReply(ctx,
 				StringArg{"very long call"},
 				func(context.Context, SimpleStringReply) {
 					t.Fatal("Should not receive anything")
 				})
 			if err != nrpc.ErrCanceled {
 				t.Fatal("Expects a ErrCanceled error, got ", err)
+			}
+		})
+
+		t.Run("VoidRequest", func(t *testing.T) {
+			ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+			err := c1.MtVoidReqStreamedReply(ctx, func(context.Context, SimpleStringReply) {})
+			if err != nil {
+				fmt.Print(err)
+				t.Error(err)
 			}
 		})
 	})

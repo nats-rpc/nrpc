@@ -22,6 +22,9 @@ service SvcCustomSubject {
     rpc MtStreamedReply(StringArg) returns (SimpleStringReply) {
         option (nrpc.streamedReply) = true;
     }
+    rpc MtVoidReqStreamedReply(nrpc.Void) returns (SimpleStringReply) {
+        option (nrpc.streamedReply) = true;
+    }
 }
 
 service SvcSubjectParams {

@@ -18,6 +18,7 @@ type SvcCustomSubjectServer interface {
 	MtSimpleReply(ctx context.Context, req StringArg) (resp SimpleStringReply, err error)
 	MtVoidReply(ctx context.Context, req StringArg) (err error)
 	MtStreamedReply(ctx context.Context, req StringArg, pushRep func(SimpleStringReply)) (err error)
+	MtVoidReqStreamedReply(ctx context.Context, pushRep func(SimpleStringReply)) (err error)
 }
 
 // SvcCustomSubjectHandler provides a NATS subscription handler that can serve a
@@ -55,7 +56,6 @@ func (h *SvcCustomSubjectHandler) MtStreamedReplyHandler(ctx context.Context, ta
 	if err != nil {
 		log.Printf("SvcCustomSubject: MtStreamedReply subject parsing failed:")
 	}
-
 	var req StringArg
 	if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 		// Handle error
@@ -70,6 +70,40 @@ func (h *SvcCustomSubjectHandler) MtStreamedReplyHandler(ctx context.Context, ta
 
 	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
 		err := h.server.MtStreamedReply(ctx, req, func(rep SimpleStringReply){
+				if err = nrpc.Publish(&rep, nil, h.nc, msg.Reply, encoding); err != nil {
+					log.Printf("nrpc: error publishing response")
+					cancel()
+					return
+				}
+				msgCount++
+			})
+		return nil, err
+	})
+	keepStreamAlive.Stop()
+
+	if nrpcErr != nil {
+		nrpc.Publish(nil, nrpcErr, h.nc, msg.Reply, encoding)
+	} else {
+		nrpc.Publish(
+			nil, &nrpc.Error{Type: nrpc.Error_EOS, MsgCount: msgCount},
+			h.nc, msg.Reply, encoding)
+	}
+}
+
+func (h *SvcCustomSubjectHandler) MtVoidReqStreamedReplyHandler(ctx context.Context, tail []string, msg *nats.Msg) {
+	_, encoding, err := nrpc.ParseSubjectTail(0, tail)
+	if err != nil {
+		log.Printf("SvcCustomSubject: MtVoidReqStreamedReply subject parsing failed:")
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	keepStreamAlive := nrpc.NewKeepStreamAlive(h.nc, msg.Reply, encoding, cancel)
+
+	var msgCount uint32
+
+	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
+		err := h.server.MtVoidReqStreamedReply(ctx, func(rep SimpleStringReply){
 				if err = nrpc.Publish(&rep, nil, h.nc, msg.Reply, encoding); err != nil {
 					log.Printf("nrpc: error publishing response")
 					cancel()
@@ -165,6 +199,9 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 		return
 	case "mtstreamedreply":
 		h.MtStreamedReplyHandler(ctx, tail, msg)
+		return
+	case "mtvoidreqstreamedreply":
+		h.MtVoidReqStreamedReplyHandler(ctx, tail, msg)
 		return
 	default:
 		log.Printf("SvcCustomSubjectHandler: unknown name %q", name)
@@ -303,6 +340,31 @@ func (c *SvcCustomSubjectClient) MtStreamedReply(
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtstreamedreply";
 
 	sub, err := nrpc.StreamCall(ctx, c.nc, subject, &req, c.Encoding, c.Timeout)
+	if err != nil {
+		return err
+	}
+
+	var res SimpleStringReply
+	for {
+		err = sub.Next(&res)
+		if err != nil {
+			break
+		}
+		cb(ctx, res)
+	}
+	if err == nrpc.ErrEOS {
+		err = nil
+	}
+	return err
+}
+
+func (c *SvcCustomSubjectClient) MtVoidReqStreamedReply(
+	ctx context.Context,
+	cb func (context.Context, SimpleStringReply),
+) error {
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreqstreamedreply";
+
+	sub, err := nrpc.StreamCall(ctx, c.nc, subject, &nrpc.Void{}, c.Encoding, c.Timeout)
 	if err != nil {
 		return err
 	}
