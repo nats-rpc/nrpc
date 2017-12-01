@@ -311,7 +311,13 @@ func (sub *StreamCallSubscription) loop() {
 			sub.errCh <- ErrCanceled
 			return
 		case <-ticker.C:
-			if err := sub.nc.Publish(hbSubject, nil); err != nil {
+			msg, err := Marshal(sub.encoding, &HeartBeat{})
+			if err != nil {
+				err = fmt.Errorf("Error marshaling heartbeat: %s", err)
+				sub.errCh <- err
+				return
+			}
+			if err := sub.nc.Publish(hbSubject, msg); err != nil {
 				err = fmt.Errorf("Error sending heartbeat: %s", err)
 				sub.errCh <- err
 				return
