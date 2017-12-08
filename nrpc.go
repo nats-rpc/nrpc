@@ -18,7 +18,7 @@ import (
 // ErrStreamInvalidMsgCount is when a stream reply gets a wrong number of messages
 var ErrStreamInvalidMsgCount = errors.New("Stream reply received an incorrect number of messages")
 
-//go:generate protoc -I. -I../../.. --gogo_out=Mgoogle/protobuf/descriptor.proto=github.com/gogo/protobuf/protoc-gen-gogo/descriptor:../../.. nrpc.proto
+//go:generate protoc --go_out=../../.. nrpc.proto
 
 type NatsConn interface {
 	Publish(subj string, data []byte) error
