@@ -2,7 +2,9 @@ package nrpc_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 	"time"
@@ -83,6 +85,125 @@ func TestDecode(t *testing.T) {
 			t.Fatal("wrong response: ", string(dm.Foobar))
 		}
 	}
+}
+
+func TestStreamCall(t *testing.T) {
+	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	t.Run("Simple stream", func(t *testing.T) {
+		subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
+			time.Sleep(60 * time.Millisecond)
+			// Send an empty message
+			if err := nc.Publish(m.Reply, []byte{0}); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(60 * time.Millisecond)
+			// Send a first message
+			if err := nrpc.Publish(
+				&DummyMessage{"hello"},
+				nil,
+				nc, m.Reply, "protobuf",
+			); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(60 * time.Millisecond)
+			log.Print("Sending 'world'")
+			// Send a second message
+			if err := nrpc.Publish(
+				&DummyMessage{"world"},
+				nil,
+				nc, m.Reply, "protobuf",
+			); err != nil {
+				t.Fatal(err)
+			}
+			log.Print("Sending EOF")
+			// Send the EOS marker
+			if err := nrpc.Publish(
+				nil,
+				&nrpc.Error{Type: nrpc.Error_EOS, MsgCount: 2},
+				nc, m.Reply, "protobuf",
+			); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer subn.Unsubscribe()
+
+		sub, err := nrpc.StreamCall(
+			context.TODO(), nc, "foo.*", &DummyMessage{}, "protobuf", 100*time.Millisecond)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var dm DummyMessage
+		var cont bool
+
+		err = sub.Next(&dm)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = sub.Next(&dm)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = sub.Next(&dm)
+		if err != nrpc.ErrEOS {
+			t.Fatalf("Expected EOS, got %s", err)
+		}
+		if cont {
+			t.Errorf("Expects cont=false")
+		}
+		err = sub.Next(&dm)
+		if err != nats.ErrBadSubscription {
+			t.Errorf("Expected a ErrBadSubscription, got %s", err)
+		}
+	})
+
+	t.Run("Error", func(t *testing.T) {
+		subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
+			if err := nrpc.Publish(
+				nil,
+				&nrpc.Error{Type: nrpc.Error_CLIENT, Message: "error"},
+				nc, m.Reply, "protobuf",
+			); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer subn.Unsubscribe()
+
+		sub, err := nrpc.StreamCall(
+			context.TODO(), nc, "foo.*", &DummyMessage{}, "protobuf", 100*time.Millisecond)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = sub.Next(&DummyMessage{})
+		if err == nil {
+			t.Fatalf("Expected an error, got %s", err)
+		}
+		if nErr, ok := err.(*nrpc.Error); ok {
+			if nErr.Message != "error" {
+				t.Errorf("Expected message='error', got %s", nErr.Message)
+			}
+		} else {
+			t.Errorf("Expected a nrpc.Error, got %s", err)
+		}
+		err = sub.Next(&DummyMessage{})
+		if err != nats.ErrBadSubscription {
+			t.Errorf("Expected a ErrBadSubscription, got %s", err)
+		}
+	})
 }
 
 func TestError(t *testing.T) {

@@ -15,8 +15,8 @@ var natsURL string
 func TestMain(m *testing.M) {
 	gnatsd := natsServer.New(&natsServer.Options{Port: natsServer.RANDOM_PORT})
 	gnatsd.SetLogger(
-		logger.NewStdLogger(false, false, true, false, false),
-		false, true)
+		logger.NewStdLogger(false, false, false, false, false),
+		false, false)
 	go gnatsd.Start()
 	defer gnatsd.Shutdown()
 

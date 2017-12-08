@@ -355,6 +355,14 @@ var funcMap = template.FuncMap{
 		}
 		return []string{}
 	},
+	"HasStreamedReply": func(md *descriptor.MethodDescriptorProto) bool {
+		if opts := md.GetOptions(); opts != nil {
+			if e, err := proto.GetExtension(opts, nrpc.E_StreamedReply); err == nil {
+				return *(e.(*bool))
+			}
+		}
+		return false
+	},
 	"Prometheus": func() bool {
 		return pluginPrometheus
 	},

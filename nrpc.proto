@@ -34,18 +34,26 @@ extend google.protobuf.MethodOptions {
     string methodSubject = 52000;
     // Parameters included in the subject at the method level
     repeated string methodSubjectParams = 52001;
+    // If true, the method returns a stream of reply messages instead of just one
+    bool streamedReply = 52002;
 }
 
 message Error {
     enum Type {
         CLIENT = 0;
         SERVER = 1;
+        EOS = 3;
     }
     Type type = 1;
-	string message = 2;
+    string message = 2;
+    uint32 msgCount = 3;
 }
 
 message Void {}
 
 message NoRequest {}
 message NoReply {}
+
+message HeartBeat {
+    bool lastbeat = 1;
+}
