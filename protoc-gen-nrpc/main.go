@@ -31,12 +31,29 @@ func baseName(name string) string {
 	return name
 }
 
+// getGoPackage returns the file's go_package option.
+// If it containts a semicolon, only the part before it is returned.
+func getGoPackage(fd *descriptor.FileDescriptorProto) string {
+	pkg := fd.GetOptions().GetGoPackage()
+	if strings.Contains(pkg, ";") {
+		parts := strings.Split(pkg, ";")
+		if len(parts) > 2 {
+			log.Fatalf(
+				"protoc-gen-nrpc: go_package '%s' contains more than 1 ';'",
+				pkg)
+		}
+		pkg = parts[0]
+	}
+
+	return pkg
+}
+
 // goPackageOption interprets the file's go_package option.
 // If there is no go_package, it returns ("", "", false).
 // If there's a simple name, it returns ("", pkg, true).
 // If the option implies an import path, it returns (impPath, pkg, true).
 func goPackageOption(d *descriptor.FileDescriptorProto) (impPath, pkg string, ok bool) {
-	pkg = d.GetOptions().GetGoPackage()
+	pkg = getGoPackage(d)
 	if pkg == "" {
 		return
 	}
@@ -222,11 +239,11 @@ func getGoType(pbType string) (string, string) {
 	fd, _ := lookupMessageType(pbType)
 	name := strings.TrimPrefix(pbType, "."+fd.GetPackage()+".")
 	name = strings.Replace(name, ".", "_", -1)
-	return fd.GetOptions().GetGoPackage(), name
+	return getGoPackage(fd), name
 }
 
 func getPkgImportName(goPkg string) string {
-	if goPkg == currentFile.GetOptions().GetGoPackage() {
+	if goPkg == getGoPackage(currentFile) {
 		return ""
 	}
 	replacer := strings.NewReplacer(".", "_", "/", "_", "-", "_")
