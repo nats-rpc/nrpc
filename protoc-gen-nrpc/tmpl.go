@@ -45,7 +45,7 @@ type {{.GetName}}Server interface {
 	)
 		{{- if ne $resultType ".nrpc.NoReply" }} (
 		{{- if and (ne $resultType ".nrpc.Void") (not (HasStreamedReply .)) -}}
-		resp {{GoType $resultType}}, {{end -}}
+		resp *{{GoType $resultType}}, {{end -}}
 		err error)
 		{{- end -}}
 	{{- end}}
@@ -292,7 +292,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 					if err != nil {
 						return nil, err
 					}
-					return &innerResp, err
+					return innerResp, err
 				})
 {{- if Prometheus}}
 			elapsed = time.Since(start).Seconds()
@@ -339,7 +339,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	serverHETFor{{$serviceName}}.WithLabelValues(name).Observe(elapsed)
 {{- else}}
 	if err != nil {
-		log.Println("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
+		log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
 	}
 {{- end}}
 }
@@ -529,7 +529,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	req {{GoType .GetInputType}}
 	{{- end -}}) (
 		{{- if not (eq $resultType ".nrpc.Void" ".nrpc.NoReply") -}}
-		resp {{GoType $resultType}}, {{end -}}
+		resp *{{GoType $resultType}}, {{end -}}
 		err error) {
 {{- if Prometheus}}
 	start := time.Now()
@@ -552,7 +552,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	{{- if eq .GetOutputType ".nrpc.Void" ".nrpc.NoReply"}}
 	var resp {{GoType .GetOutputType}}
 	{{- end}}
-	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
+	err = nrpc.Call(&req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(
