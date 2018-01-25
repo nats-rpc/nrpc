@@ -339,7 +339,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	serverHETFor{{$serviceName}}.WithLabelValues(name).Observe(elapsed)
 {{- else}}
 	if err != nil {
-		log.Println("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
+		log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
 	}
 {{- end}}
 }
