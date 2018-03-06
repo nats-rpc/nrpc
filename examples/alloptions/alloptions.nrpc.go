@@ -245,7 +245,7 @@ func NewSvcCustomSubjectClient(nc nrpc.NatsConn, pkgParaminstance string) *SvcCu
 
 func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleStringReply, err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mt_simple_reply";
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mt_simple_reply"
 
 	// call
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
@@ -258,7 +258,7 @@ func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleString
 
 func (c *SvcCustomSubjectClient) MtVoidReply(req StringArg) (err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreply";
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreply"
 
 	// call
 	var resp github_com_rapidloop_nrpc.Void
@@ -337,7 +337,7 @@ func (c *SvcCustomSubjectClient) MtStreamedReply(
 	req StringArg,
 	cb func (context.Context, SimpleStringReply),
 ) error {
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtstreamedreply";
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtstreamedreply"
 
 	sub, err := nrpc.StreamCall(ctx, c.nc, subject, &req, c.Encoding, c.Timeout)
 	if err != nil {
@@ -362,7 +362,7 @@ func (c *SvcCustomSubjectClient) MtVoidReqStreamedReply(
 	ctx context.Context,
 	cb func (context.Context, SimpleStringReply),
 ) error {
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreqstreamedreply";
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreqstreamedreply"
 
 	sub, err := nrpc.StreamCall(ctx, c.nc, subject, &nrpc.Void{}, c.Encoding, c.Timeout)
 	if err != nil {
@@ -539,7 +539,7 @@ func NewSvcSubjectParamsClient(nc nrpc.NatsConn, pkgParaminstance string, svcPar
 
 func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string, ) (resp SimpleStringReply, err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtwithsubjectparams" + "." + mp1 + "." + mp2;
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtwithsubjectparams" + "." + mp1 + "." + mp2
 
 	// call
 	var req github_com_rapidloop_nrpc.Void
@@ -553,7 +553,7 @@ func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string, ) (
 
 func (c *SvcSubjectParamsClient) MtNoReply() (err error) {
 
-	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtnoreply";
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtnoreply"
 
 	// call
 	var req github_com_rapidloop_nrpc.Void
@@ -763,7 +763,7 @@ func NewClient(nc nrpc.NatsConn, pkgParaminstance string) *Client {
 		defaultTimeout: 5*time.Second,
 		pkgSubject: "root",
 		pkgParaminstance: pkgParaminstance,
-	};
+	}
 	c.SvcCustomSubject = NewSvcCustomSubjectClient(nc, c.pkgParaminstance)
 	c.NoRequestService = NewNoRequestServiceClient(nc, c.pkgParaminstance)
 	return &c
