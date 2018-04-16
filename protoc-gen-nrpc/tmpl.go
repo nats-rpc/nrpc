@@ -371,7 +371,9 @@ func New{{.GetName}}Client(nc nrpc.NatsConn
 	) *{{.GetName}}Client {
 	return &{{.GetName}}Client{
 		nc:      nc,
+		{{- if ne 0 (len $pkgSubject)}}
 		PkgSubject: "{{$pkgSubject}}",
+		{{- end}}
 		{{- range $pkgSubjectParams}}
 		PkgParam{{.}}: pkgParam{{.}},
 		{{- end}}
@@ -598,7 +600,9 @@ func NewClient(nc nrpc.NatsConn
 		nc: nc,
 		defaultEncoding: "protobuf",
 		defaultTimeout: 5*time.Second,
+		{{- if ne 0 (len $pkgSubject)}}
 		pkgSubject: "{{$pkgSubject}}",
+		{{- end}}
 		{{- range $pkgSubjectParams}}
 		pkgParam{{.}}: pkgParam{{.}},
 		{{- end}}
