@@ -277,7 +277,7 @@ func TestAll(t *testing.T) {
 				if msg.GetReply() != "Hi there" {
 					t.Errorf("Expected 'Hi there', got '%s'", msg.GetReply())
 				}
-				for _ = range []int{0, 1} {
+				for range []int{0, 1} {
 					select {
 					case rep := <-repChan:
 						if rep != "Hi there" {
