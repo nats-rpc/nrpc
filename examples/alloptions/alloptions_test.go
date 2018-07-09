@@ -178,7 +178,8 @@ func TestAll(t *testing.T) {
 				})
 
 				t.Run("Cancel", func(t *testing.T) {
-					ctx, _ := context.WithTimeout(context.Background(), 7*time.Second)
+					ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+					defer cancel()
 					err := c1.MtStreamedReply(ctx,
 						StringArg{Arg1: "very long call"},
 						func(context.Context, SimpleStringReply) {
@@ -190,7 +191,8 @@ func TestAll(t *testing.T) {
 				})
 
 				t.Run("VoidRequest", func(t *testing.T) {
-					ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
 					err := c1.MtVoidReqStreamedReply(ctx, func(context.Context, SimpleStringReply) {})
 					if err != nil {
 						fmt.Print(err)
