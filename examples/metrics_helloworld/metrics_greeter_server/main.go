@@ -15,7 +15,7 @@ import (
 
 	// This is the package containing the generated *.pb.go and *.nrpc.go
 	// files.
-	"github.com/rapidloop/nrpc/examples/metrics_helloworld/helloworld"
+	"github.com/nats-rpc/nrpc/examples/metrics_helloworld/helloworld"
 
 	// If you've used the prometheus plugin when generating the code, you
 	// can import the HTTP handler of Prometheus to serve up the metrics.

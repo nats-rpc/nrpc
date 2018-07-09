@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/nats-io/go-nats"
-	"github.com/rapidloop/nrpc"
+	"github.com/nats-rpc/nrpc"
 )
 
 type BasicServerImpl struct {

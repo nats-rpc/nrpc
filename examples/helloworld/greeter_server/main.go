@@ -12,7 +12,7 @@ import (
 
 	// This is the package containing the generated *.pb.go and *.nrpc.go
 	// files.
-	"github.com/rapidloop/nrpc/examples/helloworld/helloworld"
+	"github.com/nats-rpc/nrpc/examples/helloworld/helloworld"
 )
 
 // server implements the helloworld.GreeterServer interface.

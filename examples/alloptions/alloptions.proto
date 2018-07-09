@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package main;
 
-import "github.com/rapidloop/nrpc/nrpc.proto";
+import "github.com/nats-rpc/nrpc/nrpc.proto";
 
 option (nrpc.packageSubject) = "root";
 option (nrpc.packageSubjectParams) = "instance";

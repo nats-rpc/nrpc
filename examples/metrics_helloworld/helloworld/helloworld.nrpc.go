@@ -9,7 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/go-nats"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rapidloop/nrpc"
+	"github.com/nats-rpc/nrpc"
 )
 
 // GreeterServer is the interface that providers of the service

@@ -8,8 +8,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/go-nats"
-	github_com_rapidloop_nrpc "github.com/rapidloop/nrpc"
-	"github.com/rapidloop/nrpc"
+	github_com_nats_rpc_nrpc "github.com/nats-rpc/nrpc"
+	"github.com/nats-rpc/nrpc"
 )
 
 // SvcCustomSubjectServer is the interface that providers of the service
@@ -261,7 +261,7 @@ func (c *SvcCustomSubjectClient) MtVoidReply(req StringArg) (err error) {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreply"
 
 	// call
-	var resp github_com_rapidloop_nrpc.Void
+	var resp github_com_nats_rpc_nrpc.Void
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
@@ -445,7 +445,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtWithSubjectParamsHanlder: MtWithSubjectParams subject parsing failed: %v", err)
 			break
 		}
-		var req github_com_rapidloop_nrpc.Void
+		var req github_com_nats_rpc_nrpc.Void
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("MtWithSubjectParamsHandler: MtWithSubjectParams request unmarshal failed: %v", err)
 			replyError = &nrpc.Error{
@@ -472,7 +472,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtNoReplyHanlder: MtNoReply subject parsing failed: %v", err)
 			break
 		}
-		var req github_com_rapidloop_nrpc.Void
+		var req github_com_nats_rpc_nrpc.Void
 		if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
 			log.Printf("MtNoReplyHandler: MtNoReply request unmarshal failed: %v", err)
 			replyError = &nrpc.Error{
@@ -542,7 +542,7 @@ func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string, ) (
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtwithsubjectparams" + "." + mp1 + "." + mp2
 
 	// call
-	var req github_com_rapidloop_nrpc.Void
+	var req github_com_nats_rpc_nrpc.Void
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
@@ -556,8 +556,8 @@ func (c *SvcSubjectParamsClient) MtNoReply() (err error) {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtnoreply"
 
 	// call
-	var req github_com_rapidloop_nrpc.Void
-	var resp github_com_rapidloop_nrpc.NoReply
+	var req github_com_nats_rpc_nrpc.Void
+	var resp github_com_nats_rpc_nrpc.NoReply
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged

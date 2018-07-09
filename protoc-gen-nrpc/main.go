@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/rapidloop/nrpc"
+	"github.com/nats-rpc/nrpc"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
