@@ -26,7 +26,7 @@ func TestBasic(t *testing.T) {
 	defer nc.Close()
 
 	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
-		if err := nrpc.Publish(&DummyMessage{"world"}, nil, nc, m.Reply, "protobuf"); err != nil {
+		if err := nrpc.Publish(&DummyMessage{Foobar: "world"}, nil, nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -37,7 +37,7 @@ func TestBasic(t *testing.T) {
 
 	var dm DummyMessage
 	if err := nrpc.Call(
-		&DummyMessage{"hello"}, &dm, nc, "foo.bar", "protobuf", 5*time.Second,
+		&DummyMessage{Foobar: "hello"}, &dm, nc, "foo.bar", "protobuf", 5*time.Second,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestDecode(t *testing.T) {
 			t.Fatal(err)
 		} else if dm.Foobar != "hello" {
 			t.Fatal("unexpected inner request: " + dm.Foobar)
-		} else if err := nrpc.Publish(&DummyMessage{"world"}, nil, nc, m.Reply, "protobuf"); err != nil {
+		} else if err := nrpc.Publish(&DummyMessage{Foobar: "world"}, nil, nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -77,7 +77,7 @@ func TestDecode(t *testing.T) {
 		name = n
 		var dm DummyMessage
 		if err := nrpc.Call(
-			&DummyMessage{"hello"}, &dm, nc, "foo."+name, "protobuf", 5*time.Second,
+			&DummyMessage{Foobar: "hello"}, &dm, nc, "foo."+name, "protobuf", 5*time.Second,
 		); err != nil {
 			t.Fatal(err)
 		}
@@ -104,7 +104,7 @@ func TestStreamCall(t *testing.T) {
 			time.Sleep(60 * time.Millisecond)
 			// Send a first message
 			if err := nrpc.Publish(
-				&DummyMessage{"hello"},
+				&DummyMessage{Foobar: "hello"},
 				nil,
 				nc, m.Reply, "protobuf",
 			); err != nil {
@@ -114,7 +114,7 @@ func TestStreamCall(t *testing.T) {
 			log.Print("Sending 'world'")
 			// Send a second message
 			if err := nrpc.Publish(
-				&DummyMessage{"world"},
+				&DummyMessage{Foobar: "world"},
 				nil,
 				nc, m.Reply, "protobuf",
 			); err != nil {
@@ -215,7 +215,7 @@ func TestError(t *testing.T) {
 
 	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
 		if err := nrpc.Publish(
-			&DummyMessage{"world"},
+			&DummyMessage{Foobar: "world"},
 			&nrpc.Error{Type: nrpc.Error_CLIENT, Message: "anerror"},
 			nc, m.Reply, "protobuf",
 		); err != nil {
@@ -227,7 +227,7 @@ func TestError(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	err = nrpc.Call(&DummyMessage{"hello"}, &DummyMessage{}, nc, "foo.bar", "protobuf", 5*time.Second)
+	err = nrpc.Call(&DummyMessage{Foobar: "hello"}, &DummyMessage{}, nc, "foo.bar", "protobuf", 5*time.Second)
 	if err == nil {
 		t.Fatal("error expected")
 	}
@@ -245,7 +245,7 @@ func TestTimeout(t *testing.T) {
 
 	subn, err := nc.Subscribe("foo.*", func(m *nats.Msg) {
 		time.Sleep(time.Second)
-		if err := nrpc.Publish(&DummyMessage{"world"}, nil, nc, m.Reply, "protobuf"); err != nil {
+		if err := nrpc.Publish(&DummyMessage{Foobar: "world"}, nil, nc, m.Reply, "protobuf"); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -254,7 +254,7 @@ func TestTimeout(t *testing.T) {
 	}
 	defer subn.Unsubscribe()
 
-	err = nrpc.Call(&DummyMessage{"hello"}, &DummyMessage{}, nc, "foo.bar", "protobuf", 500*time.Millisecond)
+	err = nrpc.Call(&DummyMessage{Foobar: "hello"}, &DummyMessage{}, nc, "foo.bar", "protobuf", 500*time.Millisecond)
 	if err == nil {
 		t.Fatal("error expected")
 	} else if err.Error() != "nats: timeout" {
@@ -263,7 +263,7 @@ func TestTimeout(t *testing.T) {
 }
 
 var (
-	encodingTestMsg = DummyMessage{"hello"}
+	encodingTestMsg = DummyMessage{Foobar: "hello"}
 	encodingTests   = []struct {
 		encoding string
 		data     []byte
@@ -295,7 +295,7 @@ func TestUnmarshal(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if msg != encodingTestMsg {
+			if msg.Foobar != encodingTestMsg.Foobar {
 				t.Errorf(
 					"%s decode failed. Expected %#v, got %#v",
 					tt.encoding, encodingTestMsg, msg)
@@ -312,7 +312,7 @@ func TestMarshalUnmarshalResponse(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if msg != encodingTestMsg {
+			if msg.Foobar != encodingTestMsg.Foobar {
 				t.Errorf(
 					"%s decode failed. Expected %#v, got %#v",
 					tt.encoding, encodingTestMsg, msg)
@@ -425,7 +425,7 @@ func TestParseSubject(t *testing.T) {
 func TestCaptureErrors(t *testing.T) {
 	t.Run("NoError", func(t *testing.T) {
 		msg, err := nrpc.CaptureErrors(func() (proto.Message, error) {
-			return &DummyMessage{"Hi"}, nil
+			return &DummyMessage{Foobar: "Hi"}, nil
 		})
 		if err != nil {
 			t.Error("Unexpected error:", err)

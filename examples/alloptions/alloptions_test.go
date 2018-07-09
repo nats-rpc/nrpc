@@ -52,11 +52,11 @@ func (s BasicServerImpl) MtStreamedReply(
 		}
 	}
 	time.Sleep(2 * time.Second)
-	send(SimpleStringReply{"msg1"})
+	send(SimpleStringReply{Reply: "msg1"})
 	time.Sleep(250 * time.Millisecond)
-	send(SimpleStringReply{"msg2"})
+	send(SimpleStringReply{Reply: "msg2"})
 	time.Sleep(250 * time.Millisecond)
-	send(SimpleStringReply{"msg3"})
+	send(SimpleStringReply{Reply: "msg3"})
 	time.Sleep(250 * time.Millisecond)
 	return nil
 }
@@ -65,14 +65,14 @@ func (s BasicServerImpl) MtVoidReqStreamedReply(
 	ctx context.Context, send func(rep SimpleStringReply),
 ) error {
 	time.Sleep(2 * time.Second)
-	send(SimpleStringReply{"hi"})
+	send(SimpleStringReply{Reply: "hi"})
 	return nil
 }
 
 func (s BasicServerImpl) MtNoReply(ctx context.Context) {
 	s.t.Log("Will publish to MtNoRequest")
-	s.handler.MtNoRequestPublish("default", SimpleStringReply{"Hi there"})
-	s.handler2.MtNoRequestWParamsPublish("default", "me", "mtvalue", SimpleStringReply{"Hi there"})
+	s.handler.MtNoRequestPublish("default", SimpleStringReply{Reply: "Hi there"})
+	s.handler2.MtNoRequestWParamsPublish("default", "me", "mtvalue", SimpleStringReply{Reply: "Hi there"})
 }
 
 func (s BasicServerImpl) MtWithSubjectParams(
@@ -126,7 +126,7 @@ func TestAll(t *testing.T) {
 			c1.Encoding = encoding
 			c2.Encoding = encoding
 
-			r, err := c1.MtSimpleReply(StringArg{"hi"})
+			r, err := c1.MtSimpleReply(StringArg{Arg1: "hi"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -134,11 +134,11 @@ func TestAll(t *testing.T) {
 				t.Error("Invalid reply:", r.GetReply())
 			}
 
-			if err := c1.MtVoidReply(StringArg{"hi"}); err != nil {
+			if err := c1.MtVoidReply(StringArg{Arg1: "hi"}); err != nil {
 				t.Error("Unexpected error:", err)
 			}
 
-			err = c1.MtVoidReply(StringArg{"please fail"})
+			err = c1.MtVoidReply(StringArg{Arg1: "please fail"})
 			if err == nil {
 				t.Error("Expected an error")
 			}
@@ -148,7 +148,7 @@ func TestAll(t *testing.T) {
 					var resList []string
 					err := c1.MtStreamedReply(
 						context.Background(),
-						StringArg{"arg"},
+						StringArg{Arg1: "arg"},
 						func(ctx context.Context, rep SimpleStringReply) {
 							resList = append(resList, rep.GetReply())
 						})
@@ -168,7 +168,7 @@ func TestAll(t *testing.T) {
 
 				t.Run("Error", func(t *testing.T) {
 					err := c1.MtStreamedReply(context.Background(),
-						StringArg{"please fail"},
+						StringArg{Arg1: "please fail"},
 						func(ctx context.Context, rep SimpleStringReply) {
 							t.Fatal("Should not receive anything")
 						})
@@ -180,7 +180,7 @@ func TestAll(t *testing.T) {
 				t.Run("Cancel", func(t *testing.T) {
 					ctx, _ := context.WithTimeout(context.Background(), 7*time.Second)
 					err := c1.MtStreamedReply(ctx,
-						StringArg{"very long call"},
+						StringArg{Arg1: "very long call"},
 						func(context.Context, SimpleStringReply) {
 							t.Fatal("Should not receive anything")
 						})
