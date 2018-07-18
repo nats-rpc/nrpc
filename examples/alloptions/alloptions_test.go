@@ -90,6 +90,14 @@ func (s BasicServerImpl) MtWithSubjectParams(
 	return
 }
 
+func (s BasicServerImpl) MtStreamedReplyWithSubjectParams(
+	ctx context.Context, mp1 string, mp2 string, send func(rep SimpleStringReply),
+) error {
+	send(SimpleStringReply{Reply: mp1})
+	send(SimpleStringReply{Reply: mp2})
+	return nil
+}
+
 func TestAll(t *testing.T) {
 	c, err := nats.Connect(natsURL)
 	if err != nil {
@@ -220,6 +228,25 @@ func TestAll(t *testing.T) {
 			} else {
 				t.Errorf("Expected a nrpc.Error, got %#v", err)
 			}
+
+			t.Run("StreamedReply with SubjectParams", func(t *testing.T) {
+				var resList []string
+				err := c2.MtStreamedReplyWithSubjectParams(
+					context.Background(),
+					"arg1", "arg2",
+					func(ctx context.Context, rep SimpleStringReply) {
+						resList = append(resList, rep.GetReply())
+					})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if resList[0] != "arg1" {
+					t.Errorf("Expected 'arg1', got '%s'", resList[0])
+				}
+				if resList[1] != "arg2" {
+					t.Errorf("Expected 'arg2', got '%s'", resList[1])
+				}
+			})
 
 			t.Run("NoRequest method with params", func(t *testing.T) {
 				sub, err := c2.MtNoRequestWParamsSubscribeSync(

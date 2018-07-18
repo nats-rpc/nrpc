@@ -387,6 +387,7 @@ func (c *SvcCustomSubjectClient) MtVoidReqStreamedReply(
 // SvcSubjectParams should implement.
 type SvcSubjectParamsServer interface {
 	MtWithSubjectParams(ctx context.Context, mp1 string, mp2 string) (resp SimpleStringReply, err error)
+	MtStreamedReplyWithSubjectParams(ctx context.Context, mp1 string, mp2 string, pushRep func(SimpleStringReply)) (err error)
 	MtNoReply(ctx context.Context)
 }
 
@@ -408,6 +409,40 @@ func NewSvcSubjectParamsHandler(ctx context.Context, nc nrpc.NatsConn, s SvcSubj
 
 func (h *SvcSubjectParamsHandler) Subject() string {
 	return "root.*.svcsubjectparams.*.>"
+}
+
+func (h *SvcSubjectParamsHandler) MtStreamedReplyWithSubjectParamsHandler(ctx context.Context, tail []string, msg *nats.Msg) {
+	mtParams, encoding, err := nrpc.ParseSubjectTail(2, tail)
+	if err != nil {
+		log.Printf("SvcSubjectParams: MtStreamedReplyWithSubjectParams subject parsing failed:")
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	keepStreamAlive := nrpc.NewKeepStreamAlive(h.nc, msg.Reply, encoding, cancel)
+
+	var msgCount uint32
+
+	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
+		err := h.server.MtStreamedReplyWithSubjectParams(ctx, mtParams[0], mtParams[1], func(rep SimpleStringReply){
+				if err = nrpc.Publish(&rep, nil, h.nc, msg.Reply, encoding); err != nil {
+					log.Printf("nrpc: error publishing response")
+					cancel()
+					return
+				}
+				msgCount++
+			})
+		return nil, err
+	})
+	keepStreamAlive.Stop()
+
+	if nrpcErr != nil {
+		nrpc.Publish(nil, nrpcErr, h.nc, msg.Reply, encoding)
+	} else {
+		nrpc.Publish(
+			nil, &nrpc.Error{Type: nrpc.Error_EOS, MsgCount: msgCount},
+			h.nc, msg.Reply, encoding)
+	}
 }
 
 func (h *SvcSubjectParamsHandler) MtNoRequestWParamsPublish(pkginstance string, svcclientid string, mtmp1 string, msg SimpleStringReply) error {
@@ -465,6 +500,9 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 				log.Printf("MtWithSubjectParamsHandler: MtWithSubjectParams handler failed: %s", replyError.Error())
 			}
 		}
+	case "mtstreamedreplywithsubjectparams":
+		h.MtStreamedReplyWithSubjectParamsHandler(ctx, tail, msg)
+		return
 	case "mtnoreply":
 		noreply = true
 		_, encoding, err = nrpc.ParseSubjectTail(0, tail)
@@ -549,6 +587,31 @@ func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string, ) (
 	}
 
 	return
+}
+
+func (c *SvcSubjectParamsClient) MtStreamedReplyWithSubjectParams(
+	ctx context.Context,mp1 string,mp2 string,
+	cb func (context.Context, SimpleStringReply),
+) error {
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtstreamedreplywithsubjectparams" + "." + mp1 + "." + mp2
+
+	sub, err := nrpc.StreamCall(ctx, c.nc, subject, &nrpc.Void{}, c.Encoding, c.Timeout)
+	if err != nil {
+		return err
+	}
+
+	var res SimpleStringReply
+	for {
+		err = sub.Next(&res)
+		if err != nil {
+			break
+		}
+		cb(ctx, res)
+	}
+	if err == nrpc.ErrEOS {
+		err = nil
+	}
+	return err
 }
 
 func (c *SvcSubjectParamsClient) MtNoReply() (err error) {

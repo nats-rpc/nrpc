@@ -158,7 +158,10 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 {{- if HasStreamedReply .}}
 
 func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail []string, msg *nats.Msg) {
-	_, encoding, err := nrpc.ParseSubjectTail({{len (GetMethodSubjectParams .)}}, tail)
+	{{if ne 0 (len (GetMethodSubjectParams .)) -}}
+		mtParams
+	{{- else -}}_{{- end -}}
+	, encoding, err := nrpc.ParseSubjectTail({{len (GetMethodSubjectParams .)}}, tail)
 	if err != nil {
 		log.Printf("{{$serviceName}}: {{.GetName}} subject parsing failed:")
 	}
@@ -179,8 +182,8 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail 
 
 	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
 		err := h.server.{{.GetName}}(ctx
-		{{- range GetMethodSubjectParams . -}}
-		, {{.}}
+		{{- range $i, $p := GetMethodSubjectParams . -}}
+		, mtParams[{{ $i }}]
 		{{- end -}}
 		{{- if ne .GetInputType ".nrpc.Void" -}}
 		, req
