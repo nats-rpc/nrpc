@@ -479,7 +479,6 @@ func (k *KeepStreamAlive) loop() {
 		select {
 		case msg := <-hbChan:
 			var hb HeartBeat
-			log.Printf("nrpc: (%s.heartbeat) received %v", k.subject, msg)
 			if err := Unmarshal(k.encoding, msg.Data, &hb); err != nil {
 				log.Printf("nrpc: error unmarshaling heartbeat: %s", err)
 				ticker.Stop()
