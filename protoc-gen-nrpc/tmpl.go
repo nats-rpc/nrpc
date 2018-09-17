@@ -214,7 +214,7 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail 
 {{- if ServiceNeedsHandler .}}
 
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(msg.Subject, msg.Reply)
+	request := nrpc.NewRequest(h.ctx, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	{{ if ne 0 (len $pkgSubjectParams)}}pkgParams{{else}}_{{end -}},
 	{{- if ne 0 (len (GetServiceSubjectParams .))}} svcParams{{else}} _{{end -}}
@@ -235,8 +235,6 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	request.SetServiceParam("{{$name}}", svcParams[{{$i}}])
 	{{- end }}
 
-	ctx := context.WithValue(h.ctx, nrpc.RequestContextKey, request)
-
 	// call handler and form response
 	var resp proto.Message
 	var replyError *nrpc.Error
@@ -247,7 +245,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		// {{.GetName}} is a no-request method. Ignore it.
 		return
 		{{- else if HasStreamedReply .}}
-		h.{{.GetName}}Handler(ctx, tail, msg)
+		h.{{.GetName}}Handler(h.ctx, tail, msg)
 		return
 		{{- else}}{{/* HasStreamedReply */}}
 		{{- if ne 0 (len (GetMethodSubjectParams .))}}
@@ -273,7 +271,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 				"{{.GetName}}", request.Encoding, "unmarshal_fail").Inc()
 {{- end}}
 		} else {
-			request.Handler = func()(proto.Message, error){
+			request.Handler = func(ctx context.Context)(proto.Message, error){
 				{{- if eq .GetOutputType ".nrpc.NoReply" -}}
 				var innerResp nrpc.NoReply
 				{{else}}

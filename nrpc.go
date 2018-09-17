@@ -239,8 +239,9 @@ const (
 )
 
 // NewRequest creates a Request instance
-func NewRequest(subject string, replySubject string) *Request {
+func NewRequest(ctx context.Context, subject string, replySubject string) *Request {
 	return &Request{
+		Context:      ctx,
 		Subject:      subject,
 		ReplySubject: replySubject,
 		CreatedAt:    time.Now(),
@@ -255,6 +256,7 @@ func GetRequest(ctx context.Context) *Request {
 
 // Request is a server-side incoming request
 type Request struct {
+	Context     context.Context
 	Subject     string
 	MethodName  string
 	SubjectTail []string
@@ -269,7 +271,7 @@ type Request struct {
 	PackageParams map[string]string
 	ServiceParams map[string]string
 
-	Handler func() (proto.Message, error)
+	Handler func(context.Context) (proto.Message, error)
 }
 
 // Elapsed duration since request was started
@@ -281,7 +283,11 @@ func (r Request) Elapsed() time.Duration {
 // that should be returned to the caller
 func (r Request) Run() (msg proto.Message, replyError *Error) {
 	r.StartedAt = time.Now()
-	msg, replyError = CaptureErrors(r.Handler)
+	ctx := context.WithValue(r.Context, RequestContextKey, &r)
+	msg, replyError = CaptureErrors(
+		func() (proto.Message, error) {
+			return r.Handler(ctx)
+		})
 	return
 }
 

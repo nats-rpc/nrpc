@@ -125,7 +125,7 @@ func (h *SvcCustomSubjectHandler) MtVoidReqStreamedReplyHandler(ctx context.Cont
 }
 
 func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(msg.Subject, msg.Reply)
+	request := nrpc.NewRequest(h.ctx, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	pkgParams, _, name, tail, err := nrpc.ParseSubject(
 		"root", 1, "custom_subject", 0, msg.Subject)
@@ -137,8 +137,6 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 	request.MethodName = name
 	request.SubjectTail = tail
 	request.SetPackageParam("instance", pkgParams[0])
-
-	ctx := context.WithValue(h.ctx, nrpc.RequestContextKey, request)
 
 	// call handler and form response
 	var resp proto.Message
@@ -158,7 +156,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 				Message: "bad request received: " + err.Error(),
 			}
 		} else {
-			request.Handler = func()(proto.Message, error){
+			request.Handler = func(ctx context.Context)(proto.Message, error){
 				innerResp, err := h.server.MtSimpleReply(ctx, req)
 				if err != nil {
 					return nil, err
@@ -184,7 +182,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 				Message: "bad request received: " + err.Error(),
 			}
 		} else {
-			request.Handler = func()(proto.Message, error){
+			request.Handler = func(ctx context.Context)(proto.Message, error){
 				var innerResp nrpc.Void
 				err := h.server.MtVoidReply(ctx, req)
 				if err != nil {
@@ -201,10 +199,10 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 		// MtNoRequest is a no-request method. Ignore it.
 		return
 	case "mtstreamedreply":
-		h.MtStreamedReplyHandler(ctx, tail, msg)
+		h.MtStreamedReplyHandler(h.ctx, tail, msg)
 		return
 	case "mtvoidreqstreamedreply":
-		h.MtVoidReqStreamedReplyHandler(ctx, tail, msg)
+		h.MtVoidReqStreamedReplyHandler(h.ctx, tail, msg)
 		return
 	default:
 		log.Printf("SvcCustomSubjectHandler: unknown name %q", name)
@@ -459,7 +457,7 @@ func (h *SvcSubjectParamsHandler) MtNoRequestWParamsPublish(pkginstance string, 
 }
 
 func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(msg.Subject, msg.Reply)
+	request := nrpc.NewRequest(h.ctx, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	pkgParams, svcParams, name, tail, err := nrpc.ParseSubject(
 		"root", 1, "svcsubjectparams", 1, msg.Subject)
@@ -472,8 +470,6 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 	request.SubjectTail = tail
 	request.SetPackageParam("instance", pkgParams[0])
 	request.SetServiceParam("clientid", svcParams[0])
-
-	ctx := context.WithValue(h.ctx, nrpc.RequestContextKey, request)
 
 	// call handler and form response
 	var resp proto.Message
@@ -494,7 +490,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 				Message: "bad request received: " + err.Error(),
 			}
 		} else {
-			request.Handler = func()(proto.Message, error){
+			request.Handler = func(ctx context.Context)(proto.Message, error){
 				innerResp, err := h.server.MtWithSubjectParams(ctx, mtParams[0], mtParams[1])
 				if err != nil {
 					return nil, err
@@ -507,7 +503,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			}
 		}
 	case "mtstreamedreplywithsubjectparams":
-		h.MtStreamedReplyWithSubjectParamsHandler(ctx, tail, msg)
+		h.MtStreamedReplyWithSubjectParamsHandler(h.ctx, tail, msg)
 		return
 	case "mtnoreply":
 		request.NoReply = true
@@ -524,7 +520,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 				Message: "bad request received: " + err.Error(),
 			}
 		} else {
-			request.Handler = func()(proto.Message, error){var innerResp nrpc.NoReply
+			request.Handler = func(ctx context.Context)(proto.Message, error){var innerResp nrpc.NoReply
 				h.server.MtNoReply(ctx)
 				if err != nil {
 					return nil, err

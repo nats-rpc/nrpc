@@ -38,7 +38,7 @@ func (h *GreeterHandler) Subject() string {
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(msg.Subject, msg.Reply)
+	request := nrpc.NewRequest(h.ctx, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	_, _, name, tail, err := nrpc.ParseSubject(
 		"nooption", 0, "Greeter", 0, msg.Subject)
@@ -49,8 +49,6 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 
 	request.MethodName = name
 	request.SubjectTail = tail
-
-	ctx := context.WithValue(h.ctx, nrpc.RequestContextKey, request)
 
 	// call handler and form response
 	var resp proto.Message
@@ -70,7 +68,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 				Message: "bad request received: " + err.Error(),
 			}
 		} else {
-			request.Handler = func()(proto.Message, error){
+			request.Handler = func(ctx context.Context)(proto.Message, error){
 				innerResp, err := h.server.SayHello(ctx, req)
 				if err != nil {
 					return nil, err
