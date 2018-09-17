@@ -100,8 +100,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	request.SubjectTail = tail
 
 	// call handler and form response
-	var resp proto.Message
-	var replyError *nrpc.Error
+	var immediateError *nrpc.Error
 	switch name {
 	case "SayHello":
 		_, request.Encoding, err = nrpc.ParseSubjectTail(0, request.SubjectTail)
@@ -112,7 +111,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 		var req HelloRequest
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
-			replyError = &nrpc.Error{
+			immediateError = &nrpc.Error{
 				Type: nrpc.Error_CLIENT,
 				Message: "bad request received: " + err.Error(),
 			}
@@ -126,34 +125,40 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 				}
 				return &innerResp, err
 			}
-			resp, replyError = request.Run()
-			if replyError != nil {
-				log.Printf("SayHelloHandler: SayHello handler failed: %s", replyError.Error())
-				serverRequestsForGreeter.WithLabelValues(
-					"SayHello", request.Encoding, "handler_fail").Inc()
-			}
 		}
 	default:
 		log.Printf("GreeterHandler: unknown name %q", name)
-		replyError = &nrpc.Error{
+		immediateError = &nrpc.Error{
 			Type: nrpc.Error_CLIENT,
 			Message: "unknown name: " + name,
 		}
 		serverRequestsForGreeter.WithLabelValues(
 			"Greeter", request.Encoding, "name_fail").Inc()
 	}
-
-
-	if !request.NoReply {
-		// encode and send response
-		err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, request.Encoding) // error is logged
+	var hasError bool
+	if immediateError != nil {
+		hasError = true
+		err = nrpc.Publish(nil, immediateError, h.nc, msg.Reply, request.Encoding)
 	} else {
-		err = nil
+		// Run the handler
+		resp, replyError := request.Run()
+
+		if replyError != nil {
+			hasError = true
+			log.Printf("GreeterHandler: %s handler failed: %s", name, replyError.Error())
+		}
+		if !request.NoReply {
+			// encode and send response
+			err = nrpc.Publish(resp, replyError, h.nc, request.ReplySubject, request.Encoding)
+		}
 	}
 	if err != nil {
 		serverRequestsForGreeter.WithLabelValues(
 			name, request.Encoding, "sendreply_fail").Inc()
-	} else if replyError == nil {
+	} else if hasError {
+			serverRequestsForGreeter.WithLabelValues(
+				name, request.Encoding, "handler_fail").Inc()
+	} else {
 		serverRequestsForGreeter.WithLabelValues(
 			name, request.Encoding, "success").Inc()
 	}

@@ -139,8 +139,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 	request.SetPackageParam("instance", pkgParams[0])
 
 	// call handler and form response
-	var resp proto.Message
-	var replyError *nrpc.Error
+	var immediateError *nrpc.Error
 	switch name {
 	case "mt_simple_reply":
 		_, request.Encoding, err = nrpc.ParseSubjectTail(0, request.SubjectTail)
@@ -151,7 +150,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 		var req StringArg
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("MtSimpleReplyHandler: MtSimpleReply request unmarshal failed: %v", err)
-			replyError = &nrpc.Error{
+			immediateError = &nrpc.Error{
 				Type: nrpc.Error_CLIENT,
 				Message: "bad request received: " + err.Error(),
 			}
@@ -163,10 +162,6 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 				}
 				return &innerResp, err
 			}
-			resp, replyError = request.Run()
-			if replyError != nil {
-				log.Printf("MtSimpleReplyHandler: MtSimpleReply handler failed: %s", replyError.Error())
-			}
 		}
 	case "mtvoidreply":
 		_, request.Encoding, err = nrpc.ParseSubjectTail(0, request.SubjectTail)
@@ -177,7 +172,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 		var req StringArg
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("MtVoidReplyHandler: MtVoidReply request unmarshal failed: %v", err)
-			replyError = &nrpc.Error{
+			immediateError = &nrpc.Error{
 				Type: nrpc.Error_CLIENT,
 				Message: "bad request received: " + err.Error(),
 			}
@@ -189,10 +184,6 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 					return nil, err
 				}
 				return &innerResp, err
-			}
-			resp, replyError = request.Run()
-			if replyError != nil {
-				log.Printf("MtVoidReplyHandler: MtVoidReply handler failed: %s", replyError.Error())
 			}
 		}
 	case "mtnorequest":
@@ -206,18 +197,24 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 		return
 	default:
 		log.Printf("SvcCustomSubjectHandler: unknown name %q", name)
-		replyError = &nrpc.Error{
+		immediateError = &nrpc.Error{
 			Type: nrpc.Error_CLIENT,
 			Message: "unknown name: " + name,
 		}
 	}
-
-
-	if !request.NoReply {
-		// encode and send response
-		err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, request.Encoding) // error is logged
+	if immediateError != nil {
+		err = nrpc.Publish(nil, immediateError, h.nc, msg.Reply, request.Encoding)
 	} else {
-		err = nil
+		// Run the handler
+		resp, replyError := request.Run()
+
+		if replyError != nil {
+			log.Printf("SvcCustomSubjectHandler: %s handler failed: %s", name, replyError.Error())
+		}
+		if !request.NoReply {
+			// encode and send response
+			err = nrpc.Publish(resp, replyError, h.nc, request.ReplySubject, request.Encoding)
+		}
 	}
 	if err != nil {
 		log.Println("SvcCustomSubjectHandler: SvcCustomSubject handler failed to publish the response: %s", err)
@@ -472,8 +469,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 	request.SetServiceParam("clientid", svcParams[0])
 
 	// call handler and form response
-	var resp proto.Message
-	var replyError *nrpc.Error
+	var immediateError *nrpc.Error
 	switch name {
 	case "mtwithsubjectparams":
 		var mtParams []string
@@ -485,7 +481,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 		var req github_com_nats_rpc_nrpc.Void
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("MtWithSubjectParamsHandler: MtWithSubjectParams request unmarshal failed: %v", err)
-			replyError = &nrpc.Error{
+			immediateError = &nrpc.Error{
 				Type: nrpc.Error_CLIENT,
 				Message: "bad request received: " + err.Error(),
 			}
@@ -496,10 +492,6 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 					return nil, err
 				}
 				return &innerResp, err
-			}
-			resp, replyError = request.Run()
-			if replyError != nil {
-				log.Printf("MtWithSubjectParamsHandler: MtWithSubjectParams handler failed: %s", replyError.Error())
 			}
 		}
 	case "mtstreamedreplywithsubjectparams":
@@ -515,7 +507,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 		var req github_com_nats_rpc_nrpc.Void
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("MtNoReplyHandler: MtNoReply request unmarshal failed: %v", err)
-			replyError = &nrpc.Error{
+			immediateError = &nrpc.Error{
 				Type: nrpc.Error_CLIENT,
 				Message: "bad request received: " + err.Error(),
 			}
@@ -527,28 +519,30 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 				}
 				return &innerResp, err
 			}
-			resp, replyError = request.Run()
-			if replyError != nil {
-				log.Printf("MtNoReplyHandler: MtNoReply handler failed: %s", replyError.Error())
-			}
 		}
 	case "mtnorequestwparams":
 		// MtNoRequestWParams is a no-request method. Ignore it.
 		return
 	default:
 		log.Printf("SvcSubjectParamsHandler: unknown name %q", name)
-		replyError = &nrpc.Error{
+		immediateError = &nrpc.Error{
 			Type: nrpc.Error_CLIENT,
 			Message: "unknown name: " + name,
 		}
 	}
-
-
-	if !request.NoReply {
-		// encode and send response
-		err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, request.Encoding) // error is logged
+	if immediateError != nil {
+		err = nrpc.Publish(nil, immediateError, h.nc, msg.Reply, request.Encoding)
 	} else {
-		err = nil
+		// Run the handler
+		resp, replyError := request.Run()
+
+		if replyError != nil {
+			log.Printf("SvcSubjectParamsHandler: %s handler failed: %s", name, replyError.Error())
+		}
+		if !request.NoReply {
+			// encode and send response
+			err = nrpc.Publish(resp, replyError, h.nc, request.ReplySubject, request.Encoding)
+		}
 	}
 	if err != nil {
 		log.Println("SvcSubjectParamsHandler: SvcSubjectParams handler failed to publish the response: %s", err)

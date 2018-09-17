@@ -236,8 +236,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	{{- end }}
 
 	// call handler and form response
-	var resp proto.Message
-	var replyError *nrpc.Error
+	var immediateError *nrpc.Error
 	switch name {
 	{{- range .Method}}
 	case "{{GetMethodSubject .}}":
@@ -262,7 +261,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		var req {{GoType .GetInputType}}
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("{{.GetName}}Handler: {{.GetName}} request unmarshal failed: %v", err)
-			replyError = &nrpc.Error{
+			immediateError = &nrpc.Error{
 				Type: nrpc.Error_CLIENT,
 				Message: "bad request received: " + err.Error(),
 			}
@@ -292,20 +291,12 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 				}
 				return &innerResp, err
 			}
-			resp, replyError = request.Run()
-			if replyError != nil {
-				log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed: %s", replyError.Error())
-{{- if Prometheus}}
-				serverRequestsFor{{$serviceName}}.WithLabelValues(
-					"{{.GetName}}", request.Encoding, "handler_fail").Inc()
-{{- end}}
-			}
 		}
 		{{- end}}{{/* not HasStreamedReply */}}
 {{- end}}{{/* range .Method */}}
 	default:
 		log.Printf("{{.GetName}}Handler: unknown name %q", name)
-		replyError = &nrpc.Error{
+		immediateError = &nrpc.Error{
 			Type: nrpc.Error_CLIENT,
 			Message: "unknown name: " + name,
 		}
@@ -315,18 +306,37 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 	}
 
-
-	if !request.NoReply {
-		// encode and send response
-		err = nrpc.Publish(resp, replyError, h.nc, msg.Reply, request.Encoding) // error is logged
+{{- if Prometheus}}
+	var hasError bool
+{{- end}}
+	if immediateError != nil {
+{{- if Prometheus}}
+		hasError = true
+{{- end}}
+		err = nrpc.Publish(nil, immediateError, h.nc, msg.Reply, request.Encoding)
 	} else {
-		err = nil
+		// Run the handler
+		resp, replyError := request.Run()
+
+		if replyError != nil {
+{{- if Prometheus}}
+			hasError = true
+{{- end}}
+			log.Printf("{{.GetName}}Handler: %s handler failed: %s", name, replyError.Error())
+		}
+		if !request.NoReply {
+			// encode and send response
+			err = nrpc.Publish(resp, replyError, h.nc, request.ReplySubject, request.Encoding)
+		}
 	}
 {{- if Prometheus}}
 	if err != nil {
 		serverRequestsFor{{$serviceName}}.WithLabelValues(
 			name, request.Encoding, "sendreply_fail").Inc()
-	} else if replyError == nil {
+	} else if hasError {
+			serverRequestsFor{{$serviceName}}.WithLabelValues(
+				name, request.Encoding, "handler_fail").Inc()
+	} else {
 		serverRequestsFor{{$serviceName}}.WithLabelValues(
 			name, request.Encoding, "success").Inc()
 	}
