@@ -228,14 +228,15 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	request.MethodName = name
 	request.SubjectTail = tail
 
-	ctx := h.ctx
-	ctx = context.WithValue(ctx, "nrpc-request", request)
 	{{- range $i, $name := $pkgSubjectParams }}
-	ctx = context.WithValue(ctx, "nrpc-pkg-{{$name}}", pkgParams[{{$i}}])
+	request.SetPackageParam("{{$name}}", pkgParams[{{$i}}])
 	{{- end }}
 	{{- range $i, $name := GetServiceSubjectParams . }}
-	ctx = context.WithValue(ctx, "nrpc-svc-{{$name}}", svcParams[{{$i}}])
+	request.SetServiceParam("{{$name}}", svcParams[{{$i}}])
 	{{- end }}
+
+	ctx := context.WithValue(h.ctx, nrpc.RequestContextKey, request)
+
 	// call handler and form response
 	var resp proto.Message
 	var replyError *nrpc.Error

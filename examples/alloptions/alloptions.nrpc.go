@@ -136,10 +136,10 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 
 	request.MethodName = name
 	request.SubjectTail = tail
+	request.SetPackageParam("instance", pkgParams[0])
 
-	ctx := h.ctx
-	ctx = context.WithValue(ctx, "nrpc-request", request)
-	ctx = context.WithValue(ctx, "nrpc-pkg-instance", pkgParams[0])
+	ctx := context.WithValue(h.ctx, nrpc.RequestContextKey, request)
+
 	// call handler and form response
 	var resp proto.Message
 	var replyError *nrpc.Error
@@ -470,11 +470,11 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 
 	request.MethodName = name
 	request.SubjectTail = tail
+	request.SetPackageParam("instance", pkgParams[0])
+	request.SetServiceParam("clientid", svcParams[0])
 
-	ctx := h.ctx
-	ctx = context.WithValue(ctx, "nrpc-request", request)
-	ctx = context.WithValue(ctx, "nrpc-pkg-instance", pkgParams[0])
-	ctx = context.WithValue(ctx, "nrpc-svc-clientid", svcParams[0])
+	ctx := context.WithValue(h.ctx, nrpc.RequestContextKey, request)
+
 	// call handler and form response
 	var resp proto.Message
 	var replyError *nrpc.Error

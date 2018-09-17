@@ -15,6 +15,9 @@ import (
 	nats "github.com/nats-io/go-nats"
 )
 
+// ContextKey type for storing values into context.Context
+type ContextKey int
+
 // ErrStreamInvalidMsgCount is when a stream reply gets a wrong number of messages
 var ErrStreamInvalidMsgCount = errors.New("Stream reply received an incorrect number of messages")
 
@@ -230,6 +233,11 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 	return nil
 }
 
+const (
+	// RequestContextKey is the key for string the request into the context
+	RequestContextKey ContextKey = iota
+)
+
 // NewRequest creates a Request instance
 func NewRequest(subject string, replySubject string) *Request {
 	return &Request{
@@ -237,6 +245,12 @@ func NewRequest(subject string, replySubject string) *Request {
 		ReplySubject: replySubject,
 		CreatedAt:    time.Now(),
 	}
+}
+
+// GetRequest returns the Request associated with a context, or nil if absent
+func GetRequest(ctx context.Context) *Request {
+	request, _ := ctx.Value(RequestContextKey).(*Request)
+	return request
 }
 
 // Request is a server-side incoming request
@@ -252,6 +266,9 @@ type Request struct {
 	NoReply      bool
 	ReplySubject string
 
+	PackageParams map[string]string
+	ServiceParams map[string]string
+
 	Handler func() (proto.Message, error)
 }
 
@@ -266,6 +283,38 @@ func (r Request) Run() (msg proto.Message, replyError *Error) {
 	r.StartedAt = time.Now()
 	msg, replyError = CaptureErrors(r.Handler)
 	return
+}
+
+// PackageParam returns a package parameter value, or "" if absent
+func (r *Request) PackageParam(key string) string {
+	if r == nil || r.PackageParams == nil {
+		return ""
+	}
+	return r.PackageParams[key]
+}
+
+// ServiceParam returns a package parameter value, or "" if absent
+func (r *Request) ServiceParam(key string) string {
+	if r == nil || r.ServiceParams == nil {
+		return ""
+	}
+	return r.ServiceParams[key]
+}
+
+// SetPackageParam sets a package param value
+func (r *Request) SetPackageParam(key, value string) {
+	if r.PackageParams == nil {
+		r.PackageParams = make(map[string]string)
+	}
+	r.PackageParams[key] = value
+}
+
+// SetServiceParam sets a service param value
+func (r *Request) SetServiceParam(key, value string) {
+	if r.ServiceParams == nil {
+		r.ServiceParams = make(map[string]string)
+	}
+	r.ServiceParams[key] = value
 }
 
 // Reply is a server-side reply

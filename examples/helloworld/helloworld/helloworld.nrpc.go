@@ -50,8 +50,8 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	request.MethodName = name
 	request.SubjectTail = tail
 
-	ctx := h.ctx
-	ctx = context.WithValue(ctx, "nrpc-request", request)
+	ctx := context.WithValue(h.ctx, nrpc.RequestContextKey, request)
+
 	// call handler and form response
 	var resp proto.Message
 	var replyError *nrpc.Error

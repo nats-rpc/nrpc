@@ -20,8 +20,8 @@ type BasicServerImpl struct {
 func (s BasicServerImpl) MtSimpleReply(
 	ctx context.Context, args StringArg,
 ) (resp SimpleStringReply, err error) {
-	if ctx.Value("nrpc-pkg-instance").(string) != "default" {
-		s.t.Error("Got an invalid nrpc-pkg-instance:", ctx.Value("nrpc-pkg-instance"))
+	if instance := nrpc.GetRequest(ctx).PackageParam("instance"); instance != "default" {
+		s.t.Errorf("Got an invalid package param instance: '%s'", instance)
 	}
 	resp.Reply = args.Arg1
 	return
