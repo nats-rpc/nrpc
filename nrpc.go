@@ -230,6 +230,50 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 	return nil
 }
 
+// NewRequest creates a Request instance
+func NewRequest(subject string, replySubject string) *Request {
+	return &Request{
+		Subject:      subject,
+		ReplySubject: replySubject,
+		CreatedAt:    time.Now(),
+	}
+}
+
+// Request is a server-side incoming request
+type Request struct {
+	Subject     string
+	MethodName  string
+	SubjectTail []string
+
+	CreatedAt time.Time
+	StartedAt time.Time
+
+	Encoding     string
+	NoReply      bool
+	ReplySubject string
+
+	Handler func() (proto.Message, error)
+}
+
+// Elapsed duration since request was started
+func (r Request) Elapsed() time.Duration {
+	return time.Since(r.CreatedAt)
+}
+
+// Run the handler and capture any error. Returns the response or the error
+// that should be returned to the caller
+func (r Request) Run() (msg proto.Message, replyError *Error) {
+	r.StartedAt = time.Now()
+	msg, replyError = CaptureErrors(r.Handler)
+	return
+}
+
+// Reply is a server-side reply
+type Reply struct {
+	Message proto.Message
+	Error   *Error
+}
+
 var ErrEOS = errors.New("End of stream")
 var ErrCanceled = errors.New("Call canceled")
 
