@@ -52,19 +52,7 @@ func (h *SvcCustomSubjectHandler) MtNoRequestPublish(pkginstance string, msg Sim
 }
 
 func (h *SvcCustomSubjectHandler) MtStreamedReplyHandler(
-	ctx context.Context, request *nrpc.Request, data []byte,
-) {
-	_, encoding, err := nrpc.ParseSubjectTail(0, request.SubjectTail)
-	if err != nil {
-		log.Printf("SvcCustomSubject: MtStreamedReply subject parsing failed:")
-	}
-	request.Encoding = encoding
-	var req StringArg
-	if err := nrpc.Unmarshal(encoding, data, &req); err != nil {
-		// Handle error
-		return
-	}
-
+	ctx context.Context, request *nrpc.Request, req StringArg) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	keepStreamAlive := nrpc.NewKeepStreamAlive(
@@ -75,13 +63,13 @@ func (h *SvcCustomSubjectHandler) MtStreamedReplyHandler(
 
 	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
 		err := h.server.MtStreamedReply(ctx, req, func(rep SimpleStringReply){
-				if err = request.SendReply(&rep, nil); err != nil {
-					log.Printf("nrpc: error publishing response")
-					cancel()
-					return
-				}
-				msgCount++
-			})
+			if err := request.SendReply(&rep, nil); err != nil {
+				log.Printf("nrpc: error publishing response")
+				cancel()
+				return
+			}
+			msgCount++
+		})
 		return nil, err
 	})
 	keepStreamAlive.Stop()
@@ -96,14 +84,7 @@ func (h *SvcCustomSubjectHandler) MtStreamedReplyHandler(
 }
 
 func (h *SvcCustomSubjectHandler) MtVoidReqStreamedReplyHandler(
-	ctx context.Context, request *nrpc.Request, data []byte,
-) {
-	_, encoding, err := nrpc.ParseSubjectTail(0, request.SubjectTail)
-	if err != nil {
-		log.Printf("SvcCustomSubject: MtVoidReqStreamedReply subject parsing failed:")
-	}
-	request.Encoding = encoding
-
+	ctx context.Context, request *nrpc.Request) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	keepStreamAlive := nrpc.NewKeepStreamAlive(
@@ -114,13 +95,13 @@ func (h *SvcCustomSubjectHandler) MtVoidReqStreamedReplyHandler(
 
 	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
 		err := h.server.MtVoidReqStreamedReply(ctx, func(rep SimpleStringReply){
-				if err = request.SendReply(&rep, nil); err != nil {
-					log.Printf("nrpc: error publishing response")
-					cancel()
-					return
-				}
-				msgCount++
-			})
+			if err := request.SendReply(&rep, nil); err != nil {
+				log.Printf("nrpc: error publishing response")
+				cancel()
+				return
+			}
+			msgCount++
+		})
 		return nil, err
 	})
 	keepStreamAlive.Stop()
@@ -200,11 +181,39 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 		// MtNoRequest is a no-request method. Ignore it.
 		return
 	case "mtstreamedreply":
-		h.MtStreamedReplyHandler(h.ctx, request, msg.Data)
-		return
+		_, request.Encoding, err = nrpc.ParseSubjectTail(0, request.SubjectTail)
+		if err != nil {
+			log.Printf("MtStreamedReplyHanlder: MtStreamedReply subject parsing failed: %v", err)
+			break
+		}
+		var req StringArg
+		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
+			log.Printf("MtStreamedReplyHandler: MtStreamedReply request unmarshal failed: %v", err)
+			immediateError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
+		} else {
+			h.MtStreamedReplyHandler(h.ctx, request, req)
+			return
+		}
 	case "mtvoidreqstreamedreply":
-		h.MtVoidReqStreamedReplyHandler(h.ctx, request, msg.Data)
-		return
+		_, request.Encoding, err = nrpc.ParseSubjectTail(0, request.SubjectTail)
+		if err != nil {
+			log.Printf("MtVoidReqStreamedReplyHanlder: MtVoidReqStreamedReply subject parsing failed: %v", err)
+			break
+		}
+		var req github_com_nats_rpc_nrpc.Void
+		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
+			log.Printf("MtVoidReqStreamedReplyHandler: MtVoidReqStreamedReply request unmarshal failed: %v", err)
+			immediateError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
+		} else {
+			h.MtVoidReqStreamedReplyHandler(h.ctx, request)
+			return
+		}
 	default:
 		log.Printf("SvcCustomSubjectHandler: unknown name %q", name)
 		immediateError = &nrpc.Error{
@@ -420,14 +429,7 @@ func (h *SvcSubjectParamsHandler) Subject() string {
 }
 
 func (h *SvcSubjectParamsHandler) MtStreamedReplyWithSubjectParamsHandler(
-	ctx context.Context, request *nrpc.Request, data []byte,
-) {
-	mtParams, encoding, err := nrpc.ParseSubjectTail(2, request.SubjectTail)
-	if err != nil {
-		log.Printf("SvcSubjectParams: MtStreamedReplyWithSubjectParams subject parsing failed:")
-	}
-	request.Encoding = encoding
-
+	ctx context.Context, request *nrpc.Request, mtParams []string) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	keepStreamAlive := nrpc.NewKeepStreamAlive(
@@ -438,13 +440,13 @@ func (h *SvcSubjectParamsHandler) MtStreamedReplyWithSubjectParamsHandler(
 
 	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
 		err := h.server.MtStreamedReplyWithSubjectParams(ctx, mtParams[0], mtParams[1], func(rep SimpleStringReply){
-				if err = request.SendReply(&rep, nil); err != nil {
-					log.Printf("nrpc: error publishing response")
-					cancel()
-					return
-				}
-				msgCount++
-			})
+			if err := request.SendReply(&rep, nil); err != nil {
+				log.Printf("nrpc: error publishing response")
+				cancel()
+				return
+			}
+			msgCount++
+		})
 		return nil, err
 	})
 	keepStreamAlive.Stop()
@@ -510,8 +512,23 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			}
 		}
 	case "mtstreamedreplywithsubjectparams":
-		h.MtStreamedReplyWithSubjectParamsHandler(h.ctx, request, msg.Data)
-		return
+		var mtParams []string
+		mtParams, request.Encoding, err = nrpc.ParseSubjectTail(2, request.SubjectTail)
+		if err != nil {
+			log.Printf("MtStreamedReplyWithSubjectParamsHanlder: MtStreamedReplyWithSubjectParams subject parsing failed: %v", err)
+			break
+		}
+		var req github_com_nats_rpc_nrpc.Void
+		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
+			log.Printf("MtStreamedReplyWithSubjectParamsHandler: MtStreamedReplyWithSubjectParams request unmarshal failed: %v", err)
+			immediateError = &nrpc.Error{
+				Type: nrpc.Error_CLIENT,
+				Message: "bad request received: " + err.Error(),
+			}
+		} else {
+			h.MtStreamedReplyWithSubjectParamsHandler(h.ctx, request, mtParams)
+			return
+		}
 	case "mtnoreply":
 		request.NoReply = true
 		_, request.Encoding, err = nrpc.ParseSubjectTail(0, request.SubjectTail)
