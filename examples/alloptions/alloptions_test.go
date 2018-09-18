@@ -158,6 +158,7 @@ func TestAll(t *testing.T) {
 						context.Background(),
 						StringArg{Arg1: "arg"},
 						func(ctx context.Context, rep SimpleStringReply) {
+							fmt.Println("received", rep)
 							resList = append(resList, rep.GetReply())
 						})
 					if err != nil {

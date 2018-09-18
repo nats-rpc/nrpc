@@ -155,54 +155,6 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 	return h.nc.Publish(subject, rawMsg)
 }
 {{- end}}
-{{- if HasStreamedReply .}}
-
-func (h *{{$serviceName}}Handler) {{.GetName}}Handler(
-	ctx context.Context, request *nrpc.Request
-	{{- if GetMethodSubjectParams . -}}
-	, mtParams []string
-	{{- end -}}
-	{{- if ne .GetInputType ".nrpc.Void" -}}
-	, req {{GoType .GetInputType}}
-	{{- end -}}
-) {
-	ctx, cancel := context.WithCancel(ctx)
-
-	keepStreamAlive := nrpc.NewKeepStreamAlive(
-		request.Conn, request.ReplySubject, request.Encoding, cancel,
-	)
-
-	var msgCount uint32
-
-	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
-		err := h.server.{{.GetName}}(ctx
-		{{- range $i, $p := GetMethodSubjectParams . -}}
-		, mtParams[{{ $i }}]
-		{{- end -}}
-		{{- if ne .GetInputType ".nrpc.Void" -}}
-		, req
-		{{- end -}}
-		, func(rep {{GoType .GetOutputType}}){
-			if err := request.SendReply(&rep, nil); err != nil {
-				log.Printf("nrpc: error publishing response")
-				cancel()
-				return
-			}
-			msgCount++
-		})
-		return nil, err
-	})
-	keepStreamAlive.Stop()
-
-	if nrpcErr != nil {
-		request.SendReply(nil, nrpcErr)
-	} else {
-		request.SendReply(
-			nil, &nrpc.Error{Type: nrpc.Error_EOS, MsgCount: msgCount},
-		)
-	}
-}
-{{- end}}
 {{- end}}
 
 {{- if ServiceNeedsHandler .}}
@@ -262,15 +214,20 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 		} else {
 			{{- if HasStreamedReply .}}
-			h.{{.GetName}}Handler(h.ctx, request
-				{{- if GetMethodSubjectParams . -}}
-				, mtParams
+			request.SetupStreamedReply()
+			request.Handler = func(ctx context.Context)(proto.Message, error){
+				err := h.server.{{.GetName}}(ctx
+				{{- range $i, $p := GetMethodSubjectParams . -}}
+				, mtParams[{{ $i }}]
 				{{- end -}}
 				{{- if ne .GetInputType ".nrpc.Void" -}}
 				, req
 				{{- end -}}
-			)
-			return
+				, func(rep {{GoType .GetOutputType}}){
+					request.SendStreamReply(&rep)
+				})
+				return nil, err
+			}
 			{{- else }}
 			request.Handler = func(ctx context.Context)(proto.Message, error){
 				{{- if eq .GetOutputType ".nrpc.NoReply" -}}

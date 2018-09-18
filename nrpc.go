@@ -260,6 +260,11 @@ type Request struct {
 	Context context.Context
 	Conn    NatsConn
 
+	KeepStreamAlive *KeepStreamAlive
+	StreamContext   context.Context
+	StreamCancel    func()
+	StreamMsgCount  uint32
+
 	Subject     string
 	MethodName  string
 	SubjectTail []string
@@ -286,7 +291,11 @@ func (r Request) Elapsed() time.Duration {
 // that should be returned to the caller
 func (r Request) Run() (msg proto.Message, replyError *Error) {
 	r.StartedAt = time.Now()
-	ctx := context.WithValue(r.Context, RequestContextKey, &r)
+	ctx := r.Context
+	if r.StreamedReply() {
+		ctx = r.StreamContext
+	}
+	ctx = context.WithValue(ctx, RequestContextKey, &r)
 	msg, replyError = CaptureErrors(
 		func() (proto.Message, error) {
 			return r.Handler(ctx)
@@ -326,8 +335,44 @@ func (r *Request) SetServiceParam(key, value string) {
 	r.ServiceParams[key] = value
 }
 
+// SetupStreamedReply initializes the reply stream
+func (r *Request) SetupStreamedReply() {
+	r.StreamContext, r.StreamCancel = context.WithCancel(r.Context)
+	r.KeepStreamAlive = NewKeepStreamAlive(
+		r.Conn, r.ReplySubject, r.Encoding, r.StreamCancel)
+}
+
+// StreamedReply returns true if the request reply is streamed
+func (r Request) StreamedReply() bool {
+	return r.KeepStreamAlive != nil
+}
+
+// SendStreamReply send a reply a part of a stream
+func (r *Request) SendStreamReply(msg proto.Message) {
+	log.Printf("nrpc: SendStreamReply")
+	if err := r.sendReply(msg, nil); err != nil {
+		log.Printf("nrpc: error publishing response")
+		r.StreamCancel()
+		return
+	}
+	r.StreamMsgCount++
+}
+
 // SendReply sends a reply to the caller
 func (r *Request) SendReply(resp proto.Message, withError *Error) error {
+	if r.StreamedReply() {
+		r.KeepStreamAlive.Stop()
+		if withError == nil {
+			return r.sendReply(
+				nil, &Error{Type: Error_EOS, MsgCount: r.StreamMsgCount},
+			)
+		}
+	}
+	return r.sendReply(resp, withError)
+}
+
+// sendReply sends a reply to the caller
+func (r *Request) sendReply(resp proto.Message, withError *Error) error {
 	return Publish(resp, withError, r.Conn, r.ReplySubject, r.Encoding)
 }
 
