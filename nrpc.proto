@@ -43,6 +43,7 @@ message Error {
         CLIENT = 0;
         SERVER = 1;
         EOS = 3;
+        SERVERTOOBUSY = 4;
     }
     Type type = 1;
     string message = 2;

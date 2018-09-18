@@ -106,9 +106,10 @@ var (
 // {{.GetName}}Handler provides a NATS subscription handler that can serve a
 // subscription using a given {{.GetName}}Server implementation.
 type {{.GetName}}Handler struct {
-	ctx    context.Context
-	nc     nrpc.NatsConn
-	server {{.GetName}}Server
+	ctx     context.Context
+	workers *nrpc.WorkerPool
+	nc      nrpc.NatsConn
+	server  {{.GetName}}Server
 }
 
 func New{{.GetName}}Handler(ctx context.Context, nc nrpc.NatsConn, s {{.GetName}}Server) *{{.GetName}}Handler {
@@ -116,6 +117,14 @@ func New{{.GetName}}Handler(ctx context.Context, nc nrpc.NatsConn, s {{.GetName}
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
+	}
+}
+
+func New{{.GetName}}ConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.NatsConn, s {{.GetName}}Server) *{{.GetName}}Handler {
+	return &{{.GetName}}Handler{
+		workers: workers,
+		nc:      nc,
+		server:  s,
 	}
 }
 
@@ -160,7 +169,13 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 {{- if ServiceNeedsHandler .}}
 
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(h.ctx, h.nc, msg.Subject, msg.Reply)
+	var ctx context.Context
+	if h.workers != nil {
+		ctx = h.workers.Context
+	} else {
+		ctx = h.ctx
+	}
+	request := nrpc.NewRequest(ctx, h.nc, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	{{ if ne 0 (len $pkgSubjectParams)}}pkgParams{{else}}_{{end -}},
 	{{- if ne 0 (len (GetServiceSubjectParams .))}} svcParams{{else}} _{{end -}}
@@ -285,6 +300,21 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	}
 
 {{- end}}
+	if immediateError == nil {
+		if h.workers != nil {
+			// Try queuing the requests
+			if h.workers.QueueRequest(request) == nrpc.ErrTooManyPendingRequests {
+				immediateError = &nrpc.Error{
+					Type: nrpc.Error_SERVERTOOBUSY,
+					Message: "Too many pending requests",
+				}
+			}
+		} else {
+			// Run the handler synchronously
+			request.RunAndReply()
+		}
+	}
+
 	if immediateError != nil {
 		if err := request.SendReply(nil, immediateError); err != nil {
 			log.Println("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
@@ -298,8 +328,6 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 			request.Elapsed().Seconds())
 {{- end}}
 	} else {
-		// Run the handler
-		request.RunAndReply()
 	}
 }
 {{- end}}

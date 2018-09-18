@@ -9,6 +9,7 @@ import (
 	"log"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -678,4 +679,113 @@ func (k *KeepStreamAlive) loop() {
 			return
 		}
 	}
+}
+
+// ErrTooManyPendingRequests is returned if the pending queue is full
+var ErrTooManyPendingRequests = errors.New("Too many pending requests")
+
+// WorkerPool is a poof of workers
+type WorkerPool struct {
+	Context       context.Context
+	contextCancel context.CancelFunc
+
+	queue     chan *Request
+	waitGroup sync.WaitGroup
+	m         sync.Mutex
+
+	maxPending uint
+	size       uint
+}
+
+// NewWorkerPool creates a pool of workers
+func NewWorkerPool(ctx context.Context, size uint, maxPending uint) *WorkerPool {
+	nCtx, cancel := context.WithCancel(ctx)
+	pool := WorkerPool{
+		Context:       nCtx,
+		contextCancel: cancel,
+		queue:         make(chan *Request, maxPending),
+		maxPending:    maxPending,
+	}
+	pool.SetSize(size)
+	return &pool
+}
+
+func (pool *WorkerPool) getQueue() (queue chan *Request) {
+	pool.m.Lock()
+	queue = pool.queue
+	pool.m.Unlock()
+	return
+}
+
+func (pool *WorkerPool) worker() {
+	defer pool.waitGroup.Done()
+	for {
+		queue := pool.getQueue()
+		if queue == nil {
+			return
+		}
+		for request := range queue {
+			if request == nil {
+				return
+			}
+			request.RunAndReply()
+		}
+	}
+}
+
+// SetMaxPending changes the queue size
+func (pool *WorkerPool) SetMaxPending(value uint) {
+	if pool.maxPending == value {
+		return
+	}
+	pool.m.Lock()
+	defer pool.m.Unlock()
+
+	oldQueue := pool.queue
+	pool.queue = make(chan *Request, value)
+	pool.maxPending = value
+
+	for request, ok := <-oldQueue; ok; {
+		pool.queue <- request
+	}
+}
+
+// SetSize changes the number of workers
+func (pool *WorkerPool) SetSize(size uint) {
+	if size == pool.size {
+		return
+	}
+	if pool.queue == nil {
+		pool.queue = make(chan *Request)
+	}
+	for size < pool.size {
+		pool.queue <- nil
+		pool.size--
+	}
+	for size > pool.size {
+		pool.waitGroup.Add(1)
+		go pool.worker()
+		pool.size++
+	}
+}
+
+// QueueRequest adds a request to the queue
+// returns ErrTooManyPendingRequests if the queue is full
+func (pool *WorkerPool) QueueRequest(request *Request) error {
+	select {
+	case pool.getQueue() <- request:
+		return nil
+	default:
+		return ErrTooManyPendingRequests
+	}
+}
+
+// Close stops all the workers and wait for their completion
+// If the workers do not stop before the timeout, their context is canceled
+// Will never return if a request ignore the context
+func (pool *WorkerPool) Close(timeout time.Duration) {
+	pool.SetSize(0)
+	timer := time.AfterFunc(timeout, pool.contextCancel)
+	pool.waitGroup.Wait()
+	timer.Stop()
 }

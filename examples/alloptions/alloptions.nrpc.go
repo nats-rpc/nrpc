@@ -24,9 +24,10 @@ type SvcCustomSubjectServer interface {
 // SvcCustomSubjectHandler provides a NATS subscription handler that can serve a
 // subscription using a given SvcCustomSubjectServer implementation.
 type SvcCustomSubjectHandler struct {
-	ctx    context.Context
-	nc     nrpc.NatsConn
-	server SvcCustomSubjectServer
+	ctx     context.Context
+	workers *nrpc.WorkerPool
+	nc      nrpc.NatsConn
+	server  SvcCustomSubjectServer
 }
 
 func NewSvcCustomSubjectHandler(ctx context.Context, nc nrpc.NatsConn, s SvcCustomSubjectServer) *SvcCustomSubjectHandler {
@@ -34,6 +35,14 @@ func NewSvcCustomSubjectHandler(ctx context.Context, nc nrpc.NatsConn, s SvcCust
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
+	}
+}
+
+func NewSvcCustomSubjectConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.NatsConn, s SvcCustomSubjectServer) *SvcCustomSubjectHandler {
+	return &SvcCustomSubjectHandler{
+		workers: workers,
+		nc:      nc,
+		server:  s,
 	}
 }
 
@@ -52,7 +61,13 @@ func (h *SvcCustomSubjectHandler) MtNoRequestPublish(pkginstance string, msg Sim
 }
 
 func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(h.ctx, h.nc, msg.Subject, msg.Reply)
+	var ctx context.Context
+	if h.workers != nil {
+		ctx = h.workers.Context
+	} else {
+		ctx = h.ctx
+	}
+	request := nrpc.NewRequest(ctx, h.nc, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	pkgParams, _, name, tail, err := nrpc.ParseSubject(
 		"root", 1, "custom_subject", 0, msg.Subject)
@@ -167,13 +182,26 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 			Message: "unknown name: " + name,
 		}
 	}
+	if immediateError == nil {
+		if h.workers != nil {
+			// Try queuing the requests
+			if h.workers.QueueRequest(request) == nrpc.ErrTooManyPendingRequests {
+				immediateError = &nrpc.Error{
+					Type: nrpc.Error_SERVERTOOBUSY,
+					Message: "Too many pending requests",
+				}
+			}
+		} else {
+			// Run the handler synchronously
+			request.RunAndReply()
+		}
+	}
+
 	if immediateError != nil {
 		if err := request.SendReply(nil, immediateError); err != nil {
 			log.Println("SvcCustomSubjectHandler: SvcCustomSubject handler failed to publish the response: %s", err)
 		}
 	} else {
-		// Run the handler
-		request.RunAndReply()
 	}
 }
 
@@ -348,9 +376,10 @@ type SvcSubjectParamsServer interface {
 // SvcSubjectParamsHandler provides a NATS subscription handler that can serve a
 // subscription using a given SvcSubjectParamsServer implementation.
 type SvcSubjectParamsHandler struct {
-	ctx    context.Context
-	nc     nrpc.NatsConn
-	server SvcSubjectParamsServer
+	ctx     context.Context
+	workers *nrpc.WorkerPool
+	nc      nrpc.NatsConn
+	server  SvcSubjectParamsServer
 }
 
 func NewSvcSubjectParamsHandler(ctx context.Context, nc nrpc.NatsConn, s SvcSubjectParamsServer) *SvcSubjectParamsHandler {
@@ -358,6 +387,14 @@ func NewSvcSubjectParamsHandler(ctx context.Context, nc nrpc.NatsConn, s SvcSubj
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
+	}
+}
+
+func NewSvcSubjectParamsConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.NatsConn, s SvcSubjectParamsServer) *SvcSubjectParamsHandler {
+	return &SvcSubjectParamsHandler{
+		workers: workers,
+		nc:      nc,
+		server:  s,
 	}
 }
 
@@ -376,7 +413,13 @@ func (h *SvcSubjectParamsHandler) MtNoRequestWParamsPublish(pkginstance string, 
 }
 
 func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(h.ctx, h.nc, msg.Subject, msg.Reply)
+	var ctx context.Context
+	if h.workers != nil {
+		ctx = h.workers.Context
+	} else {
+		ctx = h.ctx
+	}
+	request := nrpc.NewRequest(ctx, h.nc, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	pkgParams, svcParams, name, tail, err := nrpc.ParseSubject(
 		"root", 1, "svcsubjectparams", 1, msg.Subject)
@@ -472,13 +515,26 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			Message: "unknown name: " + name,
 		}
 	}
+	if immediateError == nil {
+		if h.workers != nil {
+			// Try queuing the requests
+			if h.workers.QueueRequest(request) == nrpc.ErrTooManyPendingRequests {
+				immediateError = &nrpc.Error{
+					Type: nrpc.Error_SERVERTOOBUSY,
+					Message: "Too many pending requests",
+				}
+			}
+		} else {
+			// Run the handler synchronously
+			request.RunAndReply()
+		}
+	}
+
 	if immediateError != nil {
 		if err := request.SendReply(nil, immediateError); err != nil {
 			log.Println("SvcSubjectParamsHandler: SvcSubjectParams handler failed to publish the response: %s", err)
 		}
 	} else {
-		// Run the handler
-		request.RunAndReply()
 	}
 }
 
@@ -628,9 +684,10 @@ type NoRequestServiceServer interface {
 // NoRequestServiceHandler provides a NATS subscription handler that can serve a
 // subscription using a given NoRequestServiceServer implementation.
 type NoRequestServiceHandler struct {
-	ctx    context.Context
-	nc     nrpc.NatsConn
-	server NoRequestServiceServer
+	ctx     context.Context
+	workers *nrpc.WorkerPool
+	nc      nrpc.NatsConn
+	server  NoRequestServiceServer
 }
 
 func NewNoRequestServiceHandler(ctx context.Context, nc nrpc.NatsConn, s NoRequestServiceServer) *NoRequestServiceHandler {
@@ -638,6 +695,14 @@ func NewNoRequestServiceHandler(ctx context.Context, nc nrpc.NatsConn, s NoReque
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
+	}
+}
+
+func NewNoRequestServiceConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.NatsConn, s NoRequestServiceServer) *NoRequestServiceHandler {
+	return &NoRequestServiceHandler{
+		workers: workers,
+		nc:      nc,
+		server:  s,
 	}
 }
 

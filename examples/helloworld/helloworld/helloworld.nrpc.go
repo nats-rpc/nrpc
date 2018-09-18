@@ -20,9 +20,10 @@ type GreeterServer interface {
 // GreeterHandler provides a NATS subscription handler that can serve a
 // subscription using a given GreeterServer implementation.
 type GreeterHandler struct {
-	ctx    context.Context
-	nc     nrpc.NatsConn
-	server GreeterServer
+	ctx     context.Context
+	workers *nrpc.WorkerPool
+	nc      nrpc.NatsConn
+	server  GreeterServer
 }
 
 func NewGreeterHandler(ctx context.Context, nc nrpc.NatsConn, s GreeterServer) *GreeterHandler {
@@ -33,12 +34,26 @@ func NewGreeterHandler(ctx context.Context, nc nrpc.NatsConn, s GreeterServer) *
 	}
 }
 
+func NewGreeterConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.NatsConn, s GreeterServer) *GreeterHandler {
+	return &GreeterHandler{
+		workers: workers,
+		nc:      nc,
+		server:  s,
+	}
+}
+
 func (h *GreeterHandler) Subject() string {
 	return "helloworld.Greeter.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(h.ctx, h.nc, msg.Subject, msg.Reply)
+	var ctx context.Context
+	if h.workers != nil {
+		ctx = h.workers.Context
+	} else {
+		ctx = h.ctx
+	}
+	request := nrpc.NewRequest(ctx, h.nc, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	_, _, name, tail, err := nrpc.ParseSubject(
 		"helloworld", 0, "Greeter", 0, msg.Subject)
@@ -82,13 +97,26 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 			Message: "unknown name: " + name,
 		}
 	}
+	if immediateError == nil {
+		if h.workers != nil {
+			// Try queuing the requests
+			if h.workers.QueueRequest(request) == nrpc.ErrTooManyPendingRequests {
+				immediateError = &nrpc.Error{
+					Type: nrpc.Error_SERVERTOOBUSY,
+					Message: "Too many pending requests",
+				}
+			}
+		} else {
+			// Run the handler synchronously
+			request.RunAndReply()
+		}
+	}
+
 	if immediateError != nil {
 		if err := request.SendReply(nil, immediateError); err != nil {
 			log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
 		}
 	} else {
-		// Run the handler
-		request.RunAndReply()
 	}
 }
 
