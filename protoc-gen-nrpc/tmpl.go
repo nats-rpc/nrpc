@@ -267,47 +267,40 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 	}
 
 {{- if Prometheus}}
-	var hasError bool
+	request.AfterReply = func(request *nrpc.Request, success, replySuccess bool) {
+		if !replySuccess {
+			serverRequestsFor{{$serviceName}}.WithLabelValues(
+				request.MethodName, request.Encoding, "sendreply_fail").Inc()
+		}
+		if success {
+			serverRequestsFor{{$serviceName}}.WithLabelValues(
+				request.MethodName, request.Encoding, "success").Inc()
+		} else {
+			serverRequestsFor{{$serviceName}}.WithLabelValues(
+				request.MethodName, request.Encoding, "handler_fail").Inc()
+		}
+		// report metric to Prometheus
+		serverHETFor{{$serviceName}}.WithLabelValues(request.MethodName).Observe(
+			request.Elapsed().Seconds())
+	}
+
 {{- end}}
 	if immediateError != nil {
+		if err := request.SendReply(nil, immediateError); err != nil {
+			log.Println("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
 {{- if Prometheus}}
-		hasError = true
+			serverRequestsFor{{$serviceName}}.WithLabelValues(
+				request.MethodName, request.Encoding, "handler_fail").Inc()
 {{- end}}
-		err = request.SendReply(nil, immediateError)
+		}
+{{- if Prometheus}}
+		serverHETFor{{$serviceName}}.WithLabelValues(request.MethodName).Observe(
+			request.Elapsed().Seconds())
+{{- end}}
 	} else {
 		// Run the handler
-		resp, replyError := request.Run()
-
-		if replyError != nil {
-{{- if Prometheus}}
-			hasError = true
-{{- end}}
-			log.Printf("{{.GetName}}Handler: %s handler failed: %s", name, replyError.Error())
-		}
-		if !request.NoReply {
-			// encode and send response
-			err = request.SendReply(resp, replyError)
-		}
+		request.RunAndReply()
 	}
-{{- if Prometheus}}
-	if err != nil {
-		serverRequestsFor{{$serviceName}}.WithLabelValues(
-			name, request.Encoding, "sendreply_fail").Inc()
-	} else if hasError {
-			serverRequestsFor{{$serviceName}}.WithLabelValues(
-				name, request.Encoding, "handler_fail").Inc()
-	} else {
-		serverRequestsFor{{$serviceName}}.WithLabelValues(
-			name, request.Encoding, "success").Inc()
-	}
-
-	// report metric to Prometheus
-	serverHETFor{{$serviceName}}.WithLabelValues(name).Observe(request.Elapsed().Seconds())
-{{- else}}
-	if err != nil {
-		log.Println("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
-	}
-{{- end}}
 }
 {{- end}}
 

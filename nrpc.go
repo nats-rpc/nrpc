@@ -279,6 +279,8 @@ type Request struct {
 	PackageParams map[string]string
 	ServiceParams map[string]string
 
+	AfterReply func(r *Request, success bool, replySuccess bool)
+
 	Handler func(context.Context) (proto.Message, error)
 }
 
@@ -301,6 +303,25 @@ func (r Request) Run() (msg proto.Message, replyError *Error) {
 			return r.Handler(ctx)
 		})
 	return
+}
+
+// RunAndReply calls Run() and send the reply back to the caller
+func (r *Request) RunAndReply() {
+	var failed, replyFailed bool
+	resp, replyError := r.Run()
+	if replyError != nil {
+		failed = true
+		log.Printf("%s handler failed: %s", r.MethodName, replyError)
+	}
+	if !r.NoReply {
+		if err := r.SendReply(resp, replyError); err != nil {
+			replyFailed = true
+			log.Printf("%s failed to publish the response: %s", r.MethodName, err)
+		}
+	}
+	if r.AfterReply != nil {
+		r.AfterReply(r, !failed, !replyFailed)
+	}
 }
 
 // PackageParam returns a package parameter value, or "" if absent
@@ -374,12 +395,6 @@ func (r *Request) SendReply(resp proto.Message, withError *Error) error {
 // sendReply sends a reply to the caller
 func (r *Request) sendReply(resp proto.Message, withError *Error) error {
 	return Publish(resp, withError, r.Conn, r.ReplySubject, r.Encoding)
-}
-
-// Reply is a server-side reply
-type Reply struct {
-	Message proto.Message
-	Error   *Error
 }
 
 var ErrEOS = errors.New("End of stream")

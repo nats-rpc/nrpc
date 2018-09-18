@@ -83,21 +83,12 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 		}
 	}
 	if immediateError != nil {
-		err = request.SendReply(nil, immediateError)
+		if err := request.SendReply(nil, immediateError); err != nil {
+			log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
+		}
 	} else {
 		// Run the handler
-		resp, replyError := request.Run()
-
-		if replyError != nil {
-			log.Printf("GreeterHandler: %s handler failed: %s", name, replyError.Error())
-		}
-		if !request.NoReply {
-			// encode and send response
-			err = request.SendReply(resp, replyError)
-		}
-	}
-	if err != nil {
-		log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
+		request.RunAndReply()
 	}
 }
 

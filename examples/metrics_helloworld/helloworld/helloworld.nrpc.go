@@ -135,36 +135,34 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 		serverRequestsForGreeter.WithLabelValues(
 			"Greeter", request.Encoding, "name_fail").Inc()
 	}
-	var hasError bool
+	request.AfterReply = func(request *nrpc.Request, success, replySuccess bool) {
+		if !replySuccess {
+			serverRequestsForGreeter.WithLabelValues(
+				request.MethodName, request.Encoding, "sendreply_fail").Inc()
+		}
+		if success {
+			serverRequestsForGreeter.WithLabelValues(
+				request.MethodName, request.Encoding, "success").Inc()
+		} else {
+			serverRequestsForGreeter.WithLabelValues(
+				request.MethodName, request.Encoding, "handler_fail").Inc()
+		}
+		// report metric to Prometheus
+		serverHETForGreeter.WithLabelValues(request.MethodName).Observe(
+			request.Elapsed().Seconds())
+	}
 	if immediateError != nil {
-		hasError = true
-		err = request.SendReply(nil, immediateError)
+		if err := request.SendReply(nil, immediateError); err != nil {
+			log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
+			serverRequestsForGreeter.WithLabelValues(
+				request.MethodName, request.Encoding, "handler_fail").Inc()
+		}
+		serverHETForGreeter.WithLabelValues(request.MethodName).Observe(
+			request.Elapsed().Seconds())
 	} else {
 		// Run the handler
-		resp, replyError := request.Run()
-
-		if replyError != nil {
-			hasError = true
-			log.Printf("GreeterHandler: %s handler failed: %s", name, replyError.Error())
-		}
-		if !request.NoReply {
-			// encode and send response
-			err = request.SendReply(resp, replyError)
-		}
+		request.RunAndReply()
 	}
-	if err != nil {
-		serverRequestsForGreeter.WithLabelValues(
-			name, request.Encoding, "sendreply_fail").Inc()
-	} else if hasError {
-			serverRequestsForGreeter.WithLabelValues(
-				name, request.Encoding, "handler_fail").Inc()
-	} else {
-		serverRequestsForGreeter.WithLabelValues(
-			name, request.Encoding, "success").Inc()
-	}
-
-	// report metric to Prometheus
-	serverHETForGreeter.WithLabelValues(name).Observe(request.Elapsed().Seconds())
 }
 
 type GreeterClient struct {
