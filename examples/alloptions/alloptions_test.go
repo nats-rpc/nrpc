@@ -124,7 +124,7 @@ func TestAll(t *testing.T) {
 	})
 
 	t.Run("WithConcurrency", func(t *testing.T) {
-		pool := nrpc.NewWorkerPool(context.Background(), 2, 5)
+		pool := nrpc.NewWorkerPool(context.Background(), 2, 5, 10*time.Second)
 
 		handler1 := NewSvcCustomSubjectConcurrentHandler(pool, c, BasicServerImpl{t, nil, nil})
 		impl := BasicServerImpl{t, handler1, nil}
@@ -178,7 +178,7 @@ func TestAll(t *testing.T) {
 							resChan <- rep.GetReply()
 						})
 					if err != nil {
-						t.Fatal(err)
+						t.Error(err)
 					}
 				}()
 			}
@@ -191,6 +191,7 @@ func TestAll(t *testing.T) {
 		})
 
 		t.Run("Too many concurrent Stream calls", func(t *testing.T) {
+			pool.SetMaxPendingDuration(2 * time.Second)
 			var resList []string
 			var wg sync.WaitGroup
 			var resChan = make(chan string, 2)
@@ -201,7 +202,8 @@ func TestAll(t *testing.T) {
 			}()
 			for i := 0; i != 7; i++ {
 				wg.Add(1)
-				go func() {
+				time.Sleep(50 * time.Millisecond)
+				go func(i int) {
 					defer wg.Done()
 					err := c1.MtStreamedReply(
 						context.Background(),
@@ -210,10 +212,14 @@ func TestAll(t *testing.T) {
 							fmt.Println("received", rep)
 							resChan <- rep.GetReply()
 						})
-					if err != nil {
-						t.Fatal(err)
+					if i >= 4 {
+						if nrpcErr, ok := err.(*nrpc.Error); !ok || nrpcErr.Type != nrpc.Error_SERVERTOOBUSY {
+							t.Errorf("Should get a SERVERTOOBUSY error, got %v", err)
+						}
+					} else if err != nil {
+						t.Errorf("Should succeed but got: %s", err)
 					}
-				}()
+				}(i)
 			}
 
 			// Wait so the 7 calls are already queued

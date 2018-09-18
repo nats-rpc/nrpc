@@ -690,22 +690,33 @@ type WorkerPool struct {
 	contextCancel context.CancelFunc
 
 	queue     chan *Request
+	schedule  chan *Request
 	waitGroup sync.WaitGroup
 	m         sync.Mutex
 
-	maxPending uint
-	size       uint
+	size               uint
+	maxPending         uint
+	maxPendingDuration time.Duration
 }
 
 // NewWorkerPool creates a pool of workers
-func NewWorkerPool(ctx context.Context, size uint, maxPending uint) *WorkerPool {
+func NewWorkerPool(
+	ctx context.Context,
+	size uint,
+	maxPending uint,
+	maxPendingDuration time.Duration,
+) *WorkerPool {
 	nCtx, cancel := context.WithCancel(ctx)
 	pool := WorkerPool{
-		Context:       nCtx,
-		contextCancel: cancel,
-		queue:         make(chan *Request, maxPending),
-		maxPending:    maxPending,
+		Context:            nCtx,
+		contextCancel:      cancel,
+		queue:              make(chan *Request, maxPending),
+		schedule:           make(chan *Request),
+		maxPending:         maxPending,
+		maxPendingDuration: maxPendingDuration,
 	}
+	pool.waitGroup.Add(1)
+	go pool.scheduler()
 	pool.SetSize(size)
 	return &pool
 }
@@ -717,19 +728,52 @@ func (pool *WorkerPool) getQueue() (queue chan *Request) {
 	return
 }
 
-func (pool *WorkerPool) worker() {
+func (pool *WorkerPool) scheduler() {
 	defer pool.waitGroup.Done()
+
 	for {
 		queue := pool.getQueue()
 		if queue == nil {
 			return
 		}
+	queueLoop:
 		for request := range queue {
-			if request == nil {
-				return
+			now := time.Now()
+			deadline := request.CreatedAt.Add(pool.maxPendingDuration)
+
+			log.Printf("scheduler: got a request. Deadline in=%s", deadline.Sub(now))
+			if deadline.After(now) {
+				log.Printf("scheduler: try scheduling")
+				select {
+				case pool.schedule <- request:
+					log.Printf("scheduler: scheduled the request")
+					continue queueLoop
+				case <-time.After(deadline.Sub(now)):
+					// Too late
+					log.Printf("scheduler: could not schedule the request")
+				}
+			} else {
+				log.Printf("scheduler: already too late, skip scheduling")
 			}
-			request.RunAndReply()
+
+			log.Printf("Sending SERVERTOOBUSY to the caller")
+			request.SendReply(nil, &Error{
+				Type:    Error_SERVERTOOBUSY,
+				Message: "No worker available",
+			})
 		}
+	}
+}
+
+func (pool *WorkerPool) worker() {
+	defer pool.waitGroup.Done()
+	for request := range pool.schedule {
+		if request == nil {
+			log.Printf("worker: got nil, exiting")
+			return
+		}
+		log.Printf("worker: got a request, running it")
+		request.RunAndReply()
 	}
 }
 
@@ -745,9 +789,14 @@ func (pool *WorkerPool) SetMaxPending(value uint) {
 	pool.queue = make(chan *Request, value)
 	pool.maxPending = value
 
-	for request, ok := <-oldQueue; ok; {
+	for request := range oldQueue {
 		pool.queue <- request
 	}
+	close(oldQueue)
+}
+
+func (pool *WorkerPool) SetMaxPendingDuration(value time.Duration) {
+	pool.maxPendingDuration = value
 }
 
 // SetSize changes the number of workers
@@ -755,11 +804,8 @@ func (pool *WorkerPool) SetSize(size uint) {
 	if size == pool.size {
 		return
 	}
-	if pool.queue == nil {
-		pool.queue = make(chan *Request)
-	}
 	for size < pool.size {
-		pool.queue <- nil
+		pool.schedule <- nil
 		pool.size--
 	}
 	for size > pool.size {
@@ -784,7 +830,20 @@ func (pool *WorkerPool) QueueRequest(request *Request) error {
 // If the workers do not stop before the timeout, their context is canceled
 // Will never return if a request ignore the context
 func (pool *WorkerPool) Close(timeout time.Duration) {
+	// Stops all the workers so nothing more gets scheduled
 	pool.SetSize(0)
+
+	pool.m.Lock()
+	oldQueue := pool.queue
+	pool.queue = nil
+	pool.m.Unlock()
+
+	close(oldQueue)
+	for range oldQueue {
+	}
+
+	// Now wait for the workers to stop and cancel the context if they don't
+	close(pool.schedule)
 	timer := time.AfterFunc(timeout, pool.contextCancel)
 	pool.waitGroup.Wait()
 	timer.Stop()
