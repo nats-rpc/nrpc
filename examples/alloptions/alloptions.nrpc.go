@@ -51,26 +51,31 @@ func (h *SvcCustomSubjectHandler) MtNoRequestPublish(pkginstance string, msg Sim
 	return h.nc.Publish(subject, rawMsg)
 }
 
-func (h *SvcCustomSubjectHandler) MtStreamedReplyHandler(ctx context.Context, tail []string, msg *nats.Msg) {
-	_, encoding, err := nrpc.ParseSubjectTail(0, tail)
+func (h *SvcCustomSubjectHandler) MtStreamedReplyHandler(
+	ctx context.Context, request *nrpc.Request, data []byte,
+) {
+	_, encoding, err := nrpc.ParseSubjectTail(0, request.SubjectTail)
 	if err != nil {
 		log.Printf("SvcCustomSubject: MtStreamedReply subject parsing failed:")
 	}
+	request.Encoding = encoding
 	var req StringArg
-	if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
+	if err := nrpc.Unmarshal(encoding, data, &req); err != nil {
 		// Handle error
 		return
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	keepStreamAlive := nrpc.NewKeepStreamAlive(h.nc, msg.Reply, encoding, cancel)
+	keepStreamAlive := nrpc.NewKeepStreamAlive(
+		request.Conn, request.ReplySubject, request.Encoding, cancel,
+	)
 
 	var msgCount uint32
 
 	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
 		err := h.server.MtStreamedReply(ctx, req, func(rep SimpleStringReply){
-				if err = nrpc.Publish(&rep, nil, h.nc, msg.Reply, encoding); err != nil {
+				if err = request.SendReply(&rep, nil); err != nil {
 					log.Printf("nrpc: error publishing response")
 					cancel()
 					return
@@ -82,29 +87,34 @@ func (h *SvcCustomSubjectHandler) MtStreamedReplyHandler(ctx context.Context, ta
 	keepStreamAlive.Stop()
 
 	if nrpcErr != nil {
-		nrpc.Publish(nil, nrpcErr, h.nc, msg.Reply, encoding)
+		request.SendReply(nil, nrpcErr)
 	} else {
-		nrpc.Publish(
+		request.SendReply(
 			nil, &nrpc.Error{Type: nrpc.Error_EOS, MsgCount: msgCount},
-			h.nc, msg.Reply, encoding)
+		)
 	}
 }
 
-func (h *SvcCustomSubjectHandler) MtVoidReqStreamedReplyHandler(ctx context.Context, tail []string, msg *nats.Msg) {
-	_, encoding, err := nrpc.ParseSubjectTail(0, tail)
+func (h *SvcCustomSubjectHandler) MtVoidReqStreamedReplyHandler(
+	ctx context.Context, request *nrpc.Request, data []byte,
+) {
+	_, encoding, err := nrpc.ParseSubjectTail(0, request.SubjectTail)
 	if err != nil {
 		log.Printf("SvcCustomSubject: MtVoidReqStreamedReply subject parsing failed:")
 	}
+	request.Encoding = encoding
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	keepStreamAlive := nrpc.NewKeepStreamAlive(h.nc, msg.Reply, encoding, cancel)
+	keepStreamAlive := nrpc.NewKeepStreamAlive(
+		request.Conn, request.ReplySubject, request.Encoding, cancel,
+	)
 
 	var msgCount uint32
 
 	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
 		err := h.server.MtVoidReqStreamedReply(ctx, func(rep SimpleStringReply){
-				if err = nrpc.Publish(&rep, nil, h.nc, msg.Reply, encoding); err != nil {
+				if err = request.SendReply(&rep, nil); err != nil {
 					log.Printf("nrpc: error publishing response")
 					cancel()
 					return
@@ -116,16 +126,16 @@ func (h *SvcCustomSubjectHandler) MtVoidReqStreamedReplyHandler(ctx context.Cont
 	keepStreamAlive.Stop()
 
 	if nrpcErr != nil {
-		nrpc.Publish(nil, nrpcErr, h.nc, msg.Reply, encoding)
+		request.SendReply(nil, nrpcErr)
 	} else {
-		nrpc.Publish(
+		request.SendReply(
 			nil, &nrpc.Error{Type: nrpc.Error_EOS, MsgCount: msgCount},
-			h.nc, msg.Reply, encoding)
+		)
 	}
 }
 
 func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(h.ctx, msg.Subject, msg.Reply)
+	request := nrpc.NewRequest(h.ctx, h.nc, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	pkgParams, _, name, tail, err := nrpc.ParseSubject(
 		"root", 1, "custom_subject", 0, msg.Subject)
@@ -190,10 +200,10 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 		// MtNoRequest is a no-request method. Ignore it.
 		return
 	case "mtstreamedreply":
-		h.MtStreamedReplyHandler(h.ctx, tail, msg)
+		h.MtStreamedReplyHandler(h.ctx, request, msg.Data)
 		return
 	case "mtvoidreqstreamedreply":
-		h.MtVoidReqStreamedReplyHandler(h.ctx, tail, msg)
+		h.MtVoidReqStreamedReplyHandler(h.ctx, request, msg.Data)
 		return
 	default:
 		log.Printf("SvcCustomSubjectHandler: unknown name %q", name)
@@ -203,7 +213,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 		}
 	}
 	if immediateError != nil {
-		err = nrpc.Publish(nil, immediateError, h.nc, msg.Reply, request.Encoding)
+		err = request.SendReply(nil, immediateError)
 	} else {
 		// Run the handler
 		resp, replyError := request.Run()
@@ -213,7 +223,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 		}
 		if !request.NoReply {
 			// encode and send response
-			err = nrpc.Publish(resp, replyError, h.nc, request.ReplySubject, request.Encoding)
+			err = request.SendReply(resp, replyError)
 		}
 	}
 	if err != nil {
@@ -409,21 +419,26 @@ func (h *SvcSubjectParamsHandler) Subject() string {
 	return "root.*.svcsubjectparams.*.>"
 }
 
-func (h *SvcSubjectParamsHandler) MtStreamedReplyWithSubjectParamsHandler(ctx context.Context, tail []string, msg *nats.Msg) {
-	mtParams, encoding, err := nrpc.ParseSubjectTail(2, tail)
+func (h *SvcSubjectParamsHandler) MtStreamedReplyWithSubjectParamsHandler(
+	ctx context.Context, request *nrpc.Request, data []byte,
+) {
+	mtParams, encoding, err := nrpc.ParseSubjectTail(2, request.SubjectTail)
 	if err != nil {
 		log.Printf("SvcSubjectParams: MtStreamedReplyWithSubjectParams subject parsing failed:")
 	}
+	request.Encoding = encoding
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	keepStreamAlive := nrpc.NewKeepStreamAlive(h.nc, msg.Reply, encoding, cancel)
+	keepStreamAlive := nrpc.NewKeepStreamAlive(
+		request.Conn, request.ReplySubject, request.Encoding, cancel,
+	)
 
 	var msgCount uint32
 
 	_, nrpcErr := nrpc.CaptureErrors(func() (proto.Message, error) {
 		err := h.server.MtStreamedReplyWithSubjectParams(ctx, mtParams[0], mtParams[1], func(rep SimpleStringReply){
-				if err = nrpc.Publish(&rep, nil, h.nc, msg.Reply, encoding); err != nil {
+				if err = request.SendReply(&rep, nil); err != nil {
 					log.Printf("nrpc: error publishing response")
 					cancel()
 					return
@@ -435,11 +450,11 @@ func (h *SvcSubjectParamsHandler) MtStreamedReplyWithSubjectParamsHandler(ctx co
 	keepStreamAlive.Stop()
 
 	if nrpcErr != nil {
-		nrpc.Publish(nil, nrpcErr, h.nc, msg.Reply, encoding)
+		request.SendReply(nil, nrpcErr)
 	} else {
-		nrpc.Publish(
+		request.SendReply(
 			nil, &nrpc.Error{Type: nrpc.Error_EOS, MsgCount: msgCount},
-			h.nc, msg.Reply, encoding)
+		)
 	}
 }
 
@@ -454,7 +469,7 @@ func (h *SvcSubjectParamsHandler) MtNoRequestWParamsPublish(pkginstance string, 
 }
 
 func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(h.ctx, msg.Subject, msg.Reply)
+	request := nrpc.NewRequest(h.ctx, h.nc, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	pkgParams, svcParams, name, tail, err := nrpc.ParseSubject(
 		"root", 1, "svcsubjectparams", 1, msg.Subject)
@@ -495,7 +510,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			}
 		}
 	case "mtstreamedreplywithsubjectparams":
-		h.MtStreamedReplyWithSubjectParamsHandler(h.ctx, tail, msg)
+		h.MtStreamedReplyWithSubjectParamsHandler(h.ctx, request, msg.Data)
 		return
 	case "mtnoreply":
 		request.NoReply = true
@@ -531,7 +546,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 		}
 	}
 	if immediateError != nil {
-		err = nrpc.Publish(nil, immediateError, h.nc, msg.Reply, request.Encoding)
+		err = request.SendReply(nil, immediateError)
 	} else {
 		// Run the handler
 		resp, replyError := request.Run()
@@ -541,7 +556,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 		}
 		if !request.NoReply {
 			// encode and send response
-			err = nrpc.Publish(resp, replyError, h.nc, request.ReplySubject, request.Encoding)
+			err = request.SendReply(resp, replyError)
 		}
 	}
 	if err != nil {

@@ -157,18 +157,21 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 {{- end}}
 {{- if HasStreamedReply .}}
 
-func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail []string, msg *nats.Msg) {
+func (h *{{$serviceName}}Handler) {{.GetName}}Handler(
+	ctx context.Context, request *nrpc.Request, data []byte,
+) {
 	{{if ne 0 (len (GetMethodSubjectParams .)) -}}
 		mtParams
 	{{- else -}}_{{- end -}}
-	, encoding, err := nrpc.ParseSubjectTail({{len (GetMethodSubjectParams .)}}, tail)
+	, encoding, err := nrpc.ParseSubjectTail({{len (GetMethodSubjectParams .)}}, request.SubjectTail)
 	if err != nil {
 		log.Printf("{{$serviceName}}: {{.GetName}} subject parsing failed:")
 	}
+	request.Encoding = encoding
 
 	{{- if ne .GetInputType ".nrpc.Void"}}
 	var req {{GoType .GetInputType}}
-	if err := nrpc.Unmarshal(encoding, msg.Data, &req); err != nil {
+	if err := nrpc.Unmarshal(encoding, data, &req); err != nil {
 		// Handle error
 		return
 	}
@@ -176,7 +179,9 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail 
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	keepStreamAlive := nrpc.NewKeepStreamAlive(h.nc, msg.Reply, encoding, cancel)
+	keepStreamAlive := nrpc.NewKeepStreamAlive(
+		request.Conn, request.ReplySubject, request.Encoding, cancel,
+	)
 
 	var msgCount uint32
 
@@ -189,7 +194,7 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail 
 		, req
 		{{- end -}}
 		, func(rep {{GoType .GetOutputType}}){
-				if err = nrpc.Publish(&rep, nil, h.nc, msg.Reply, encoding); err != nil {
+				if err = request.SendReply(&rep, nil); err != nil {
 					log.Printf("nrpc: error publishing response")
 					cancel()
 					return
@@ -201,11 +206,11 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail 
 	keepStreamAlive.Stop()
 
 	if nrpcErr != nil {
-		nrpc.Publish(nil, nrpcErr, h.nc, msg.Reply, encoding)
+		request.SendReply(nil, nrpcErr)
 	} else {
-		nrpc.Publish(
+		request.SendReply(
 			nil, &nrpc.Error{Type: nrpc.Error_EOS, MsgCount: msgCount},
-			h.nc, msg.Reply, encoding)
+		)
 	}
 }
 {{- end}}
@@ -214,7 +219,7 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Handler(ctx context.Context, tail 
 {{- if ServiceNeedsHandler .}}
 
 func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(h.ctx, msg.Subject, msg.Reply)
+	request := nrpc.NewRequest(h.ctx, h.nc, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	{{ if ne 0 (len $pkgSubjectParams)}}pkgParams{{else}}_{{end -}},
 	{{- if ne 0 (len (GetServiceSubjectParams .))}} svcParams{{else}} _{{end -}}
@@ -244,7 +249,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		// {{.GetName}} is a no-request method. Ignore it.
 		return
 		{{- else if HasStreamedReply .}}
-		h.{{.GetName}}Handler(h.ctx, tail, msg)
+		h.{{.GetName}}Handler(h.ctx, request, msg.Data)
 		return
 		{{- else}}{{/* HasStreamedReply */}}
 		{{- if ne 0 (len (GetMethodSubjectParams .))}}
@@ -313,7 +318,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- if Prometheus}}
 		hasError = true
 {{- end}}
-		err = nrpc.Publish(nil, immediateError, h.nc, msg.Reply, request.Encoding)
+		err = request.SendReply(nil, immediateError)
 	} else {
 		// Run the handler
 		resp, replyError := request.Run()
@@ -326,7 +331,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		}
 		if !request.NoReply {
 			// encode and send response
-			err = nrpc.Publish(resp, replyError, h.nc, request.ReplySubject, request.Encoding)
+			err = request.SendReply(resp, replyError)
 		}
 	}
 {{- if Prometheus}}

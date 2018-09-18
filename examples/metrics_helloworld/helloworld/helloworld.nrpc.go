@@ -87,7 +87,7 @@ func (h *GreeterHandler) Subject() string {
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
-	request := nrpc.NewRequest(h.ctx, msg.Subject, msg.Reply)
+	request := nrpc.NewRequest(h.ctx, h.nc, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	_, _, name, tail, err := nrpc.ParseSubject(
 		"helloworld", 0, "Greeter", 0, msg.Subject)
@@ -138,7 +138,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	var hasError bool
 	if immediateError != nil {
 		hasError = true
-		err = nrpc.Publish(nil, immediateError, h.nc, msg.Reply, request.Encoding)
+		err = request.SendReply(nil, immediateError)
 	} else {
 		// Run the handler
 		resp, replyError := request.Run()
@@ -149,7 +149,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 		}
 		if !request.NoReply {
 			// encode and send response
-			err = nrpc.Publish(resp, replyError, h.nc, request.ReplySubject, request.Encoding)
+			err = request.SendReply(resp, replyError)
 		}
 	}
 	if err != nil {

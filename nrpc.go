@@ -239,9 +239,10 @@ const (
 )
 
 // NewRequest creates a Request instance
-func NewRequest(ctx context.Context, subject string, replySubject string) *Request {
+func NewRequest(ctx context.Context, conn NatsConn, subject string, replySubject string) *Request {
 	return &Request{
 		Context:      ctx,
+		Conn:         conn,
 		Subject:      subject,
 		ReplySubject: replySubject,
 		CreatedAt:    time.Now(),
@@ -256,7 +257,9 @@ func GetRequest(ctx context.Context) *Request {
 
 // Request is a server-side incoming request
 type Request struct {
-	Context     context.Context
+	Context context.Context
+	Conn    NatsConn
+
 	Subject     string
 	MethodName  string
 	SubjectTail []string
@@ -321,6 +324,11 @@ func (r *Request) SetServiceParam(key, value string) {
 		r.ServiceParams = make(map[string]string)
 	}
 	r.ServiceParams[key] = value
+}
+
+// SendReply sends a reply to the caller
+func (r *Request) SendReply(resp proto.Message, withError *Error) error {
+	return Publish(resp, withError, r.Conn, r.ReplySubject, r.Encoding)
 }
 
 // Reply is a server-side reply
