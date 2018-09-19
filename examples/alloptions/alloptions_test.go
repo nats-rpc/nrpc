@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +12,15 @@ import (
 	"github.com/nats-io/go-nats"
 	"github.com/nats-rpc/nrpc"
 )
+
+type TestingLogWriter struct {
+	t *testing.T
+}
+
+func (w TestingLogWriter) Write(p []byte) (int, error) {
+	w.t.Log(string(p))
+	return len(p), nil
+}
 
 type BasicServerImpl struct {
 	t        *testing.T
@@ -105,7 +115,10 @@ func TestAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	log.SetOutput(TestingLogWriter{t})
+
 	t.Run("NoConcurrency", func(t *testing.T) {
+		log.SetOutput(TestingLogWriter{t})
 		handler1 := NewSvcCustomSubjectHandler(context.Background(), c, BasicServerImpl{t, nil, nil})
 		impl := BasicServerImpl{t, handler1, nil}
 		handler2 := NewSvcSubjectParamsHandler(context.Background(), c, &impl)
@@ -124,7 +137,8 @@ func TestAll(t *testing.T) {
 	})
 
 	t.Run("WithConcurrency", func(t *testing.T) {
-		pool := nrpc.NewWorkerPool(context.Background(), 2, 5, 10*time.Second)
+		log.SetOutput(TestingLogWriter{t})
+		pool := nrpc.NewWorkerPool(context.Background(), 2, 5, 4*time.Second)
 
 		handler1 := NewSvcCustomSubjectConcurrentHandler(pool, c, BasicServerImpl{t, nil, nil})
 		impl := BasicServerImpl{t, handler1, nil}
@@ -144,20 +158,22 @@ func TestAll(t *testing.T) {
 
 		// Now a few tests very specific to concurrency handling
 
-		s, err := c.Subscribe(handler1.Subject(), handler1.Handler)
+		s, err := c.QueueSubscribe(handler1.Subject(), "queue", handler1.Handler)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer s.Unsubscribe()
-		s, err = c.Subscribe(handler2.Subject(), handler2.Handler)
+		s, err = c.QueueSubscribe(handler2.Subject(), "queue", handler2.Handler)
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer s.Unsubscribe()
 
 		c1 := NewSvcCustomSubjectClient(c, "default")
 		//c2 := NewSvcSubjectParamsClient(c, "default", "me")
 
 		t.Run("Concurrent Stream calls", func(t *testing.T) {
+			log.SetOutput(TestingLogWriter{t})
 			var resList []string
 			var wg sync.WaitGroup
 			var resChan = make(chan string, 2)
@@ -191,6 +207,7 @@ func TestAll(t *testing.T) {
 		})
 
 		t.Run("Too many concurrent Stream calls", func(t *testing.T) {
+			log.SetOutput(TestingLogWriter{t})
 			pool.SetMaxPendingDuration(2 * time.Second)
 			var resList []string
 			var wg sync.WaitGroup
@@ -257,15 +274,16 @@ func commonTests(
 	encoding string,
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		s, err := conn.Subscribe(handler1.Subject(), handler1.Handler)
+		s, err := conn.QueueSubscribe(handler1.Subject(), "queue", handler1.Handler)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer s.Unsubscribe()
-		s, err = conn.Subscribe(handler2.Subject(), handler2.Handler)
+		s, err = conn.QueueSubscribe(handler2.Subject(), "queue", handler2.Handler)
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer s.Unsubscribe()
 
 		c1 := NewSvcCustomSubjectClient(conn, "default")
 		c2 := NewSvcSubjectParamsClient(conn, "default", "me")
@@ -291,7 +309,9 @@ func commonTests(
 		}
 
 		t.Run("StreamedReply", func(t *testing.T) {
+			log.SetOutput(TestingLogWriter{t})
 			t.Run("Simple", func(t *testing.T) {
+				log.SetOutput(TestingLogWriter{t})
 				var resList []string
 				err := c1.MtStreamedReply(
 					context.Background(),
@@ -315,6 +335,7 @@ func commonTests(
 			})
 
 			t.Run("Error", func(t *testing.T) {
+				log.SetOutput(TestingLogWriter{t})
 				err := c1.MtStreamedReply(context.Background(),
 					StringArg{Arg1: "please fail"},
 					func(ctx context.Context, rep SimpleStringReply) {
@@ -326,6 +347,7 @@ func commonTests(
 			})
 
 			t.Run("Cancel", func(t *testing.T) {
+				log.SetOutput(TestingLogWriter{t})
 				ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 				defer cancel()
 				err := c1.MtStreamedReply(ctx,
@@ -339,6 +361,7 @@ func commonTests(
 			})
 
 			t.Run("VoidRequest", func(t *testing.T) {
+				log.SetOutput(TestingLogWriter{t})
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				err := c1.MtVoidReqStreamedReply(ctx, func(context.Context, SimpleStringReply) {})
@@ -349,27 +372,31 @@ func commonTests(
 			})
 		})
 
-		r, err = c2.MtWithSubjectParams("p1", "p2")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if r.GetReply() != "Hi" {
-			t.Error("Invalid reply:", r.GetReply())
-		}
-
-		r, err = c2.MtWithSubjectParams("invalid", "p2")
-		if err == nil {
-			t.Error("Expected an error")
-		}
-		if nErr, ok := err.(*nrpc.Error); ok {
-			if nErr.Type != nrpc.Error_CLIENT || nErr.Message != "Expects method param mp1 = 'p1', got 'invalid'" {
-				t.Errorf("Unexpected error %#v", *nErr)
+		t.Run("SubjectParams", func(t *testing.T) {
+			log.SetOutput(TestingLogWriter{t})
+			r, err = c2.MtWithSubjectParams("p1", "p2")
+			if err != nil {
+				t.Fatal(err)
 			}
-		} else {
-			t.Errorf("Expected a nrpc.Error, got %#v", err)
-		}
+			if r.GetReply() != "Hi" {
+				t.Error("Invalid reply:", r.GetReply())
+			}
+
+			r, err = c2.MtWithSubjectParams("invalid", "p2")
+			if err == nil {
+				t.Error("Expected an error")
+			}
+			if nErr, ok := err.(*nrpc.Error); ok {
+				if nErr.Type != nrpc.Error_CLIENT || nErr.Message != "Expects method param mp1 = 'p1', got 'invalid'" {
+					t.Errorf("Unexpected error %#v", *nErr)
+				}
+			} else {
+				t.Errorf("Expected a nrpc.Error, got %#v", err)
+			}
+		})
 
 		t.Run("StreamedReply with SubjectParams", func(t *testing.T) {
+			log.SetOutput(TestingLogWriter{t})
 			var resList []string
 			err := c2.MtStreamedReplyWithSubjectParams(
 				context.Background(),
@@ -389,6 +416,7 @@ func commonTests(
 		})
 
 		t.Run("NoRequest method with params", func(t *testing.T) {
+			log.SetOutput(TestingLogWriter{t})
 			sub, err := c2.MtNoRequestWParamsSubscribeSync(
 				"mtvalue",
 			)
@@ -406,6 +434,7 @@ func commonTests(
 			}
 		})
 		t.Run("NoRequest method subscriptions", func(t *testing.T) {
+			log.SetOutput(TestingLogWriter{t})
 			if encoding != "protobuf" {
 				t.Skip()
 			}
