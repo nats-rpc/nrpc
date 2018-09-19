@@ -794,10 +794,16 @@ func (pool *WorkerPool) SetMaxPending(value uint) {
 	pool.queue = make(chan *Request, value)
 	pool.maxPending = value
 
-	for request := range oldQueue {
-		pool.queue <- request
-	}
 	close(oldQueue)
+
+	// drain the old queue and cancel requests if there are too many
+	for request := range oldQueue {
+		select {
+		case pool.queue <- request:
+		default:
+			request.SendErrorTooBusy("too many pending requests")
+		}
+	}
 }
 
 // SetMaxPendingDuration changes the max pending delay
