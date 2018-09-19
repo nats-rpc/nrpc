@@ -807,6 +807,9 @@ func (pool *WorkerPool) SetMaxPendingDuration(value time.Duration) {
 
 // SetSize changes the number of workers
 func (pool *WorkerPool) SetSize(size uint) {
+	pool.m.Lock()
+	defer pool.m.Unlock()
+
 	if size == pool.size {
 		return
 	}
