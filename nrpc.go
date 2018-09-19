@@ -856,7 +856,8 @@ func (pool *WorkerPool) Close(timeout time.Duration) {
 	pool.m.Unlock()
 
 	close(oldQueue)
-	for range oldQueue {
+	for request := range oldQueue {
+		request.SendErrorTooBusy("Worker pool shutting down")
 	}
 
 	// Now wait for the workers to stop and cancel the context if they don't
