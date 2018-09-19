@@ -302,12 +302,9 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 	if immediateError == nil {
 		if h.workers != nil {
-			// Try queuing the requests
-			if h.workers.QueueRequest(request) == nrpc.ErrTooManyPendingRequests {
-				immediateError = &nrpc.Error{
-					Type: nrpc.Error_SERVERTOOBUSY,
-					Message: "Too many pending requests",
-				}
+			// Try queuing the request
+			if err := h.workers.QueueRequest(request); err != nil {
+				log.Printf("nrpc: Error queuing the request: %s", err)
 			}
 		} else {
 			// Run the handler synchronously

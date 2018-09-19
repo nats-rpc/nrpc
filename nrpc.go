@@ -398,6 +398,14 @@ func (r *Request) sendReply(resp proto.Message, withError *Error) error {
 	return Publish(resp, withError, r.Conn, r.ReplySubject, r.Encoding)
 }
 
+// SendErrorTooBusy cancels the request with a 'SERVERTOOBUSY' error
+func (r *Request) SendErrorTooBusy(msg string) error {
+	return r.SendReply(nil, &Error{
+		Type:    Error_SERVERTOOBUSY,
+		Message: msg,
+	})
+}
+
 var ErrEOS = errors.New("End of stream")
 var ErrCanceled = errors.New("Call canceled")
 
@@ -681,9 +689,6 @@ func (k *KeepStreamAlive) loop() {
 	}
 }
 
-// ErrTooManyPendingRequests is returned if the pending queue is full
-var ErrTooManyPendingRequests = errors.New("Too many pending requests")
-
 // WorkerPool is a poof of workers
 type WorkerPool struct {
 	Context       context.Context
@@ -760,10 +765,7 @@ func (pool *WorkerPool) scheduler() {
 			}
 
 			log.Printf("Sending SERVERTOOBUSY to the caller")
-			request.SendReply(nil, &Error{
-				Type:    Error_SERVERTOOBUSY,
-				Message: "No worker available",
-			})
+			request.SendErrorTooBusy("No worker available")
 		}
 	}
 }
@@ -825,13 +827,13 @@ func (pool *WorkerPool) SetSize(size uint) {
 }
 
 // QueueRequest adds a request to the queue
-// returns ErrTooManyPendingRequests if the queue is full
+// Send a SERVERTOOBUSY error to the client if the queue is full
 func (pool *WorkerPool) QueueRequest(request *Request) error {
 	select {
 	case pool.getQueue() <- request:
 		return nil
 	default:
-		return ErrTooManyPendingRequests
+		return request.SendErrorTooBusy("too many pending requests")
 	}
 }
 
