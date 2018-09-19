@@ -387,9 +387,8 @@ func (r *Request) StreamedReply() bool {
 
 // SendStreamReply send a reply a part of a stream
 func (r *Request) SendStreamReply(msg proto.Message) {
-	log.Printf("nrpc: SendStreamReply")
 	if err := r.sendReply(msg, nil); err != nil {
-		log.Printf("nrpc: error publishing response")
+		log.Printf("nrpc: error publishing response: %s", err)
 		r.StreamCancel()
 		return
 	}
@@ -765,25 +764,17 @@ func (pool *WorkerPool) scheduler() {
 			deadline := request.CreatedAt.Add(pool.maxPendingDuration)
 			pool.m.Unlock()
 
-			log.Printf("scheduler: got a request. Deadline in=%s", deadline.Sub(now))
 			if deadline.After(now) {
 				// Safety call to setupStreamedReply in case QueueRequest had
 				// to time to do it yet
 				request.setupStreamedReply()
-				log.Printf("scheduler: try scheduling")
 				select {
 				case pool.schedule <- request:
-					log.Printf("scheduler: scheduled the request")
 					continue queueLoop
 				case <-time.After(deadline.Sub(now)):
 					// Too late
-					log.Printf("scheduler: could not schedule the request")
 				}
-			} else {
-				log.Printf("scheduler: already too late, skip scheduling")
 			}
-
-			log.Printf("Sending SERVERTOOBUSY to the caller")
 			request.SendErrorTooBusy("No worker available")
 		}
 	}
@@ -793,10 +784,8 @@ func (pool *WorkerPool) worker() {
 	defer pool.waitGroup.Done()
 	for request := range pool.schedule {
 		if request == nil {
-			log.Printf("worker: got nil, exiting")
 			return
 		}
-		log.Printf("worker: got a request, running it")
 		request.RunAndReply()
 	}
 }
