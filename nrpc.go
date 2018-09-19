@@ -288,19 +288,19 @@ type Request struct {
 }
 
 // Elapsed duration since request was started
-func (r Request) Elapsed() time.Duration {
+func (r *Request) Elapsed() time.Duration {
 	return time.Since(r.CreatedAt)
 }
 
 // Run the handler and capture any error. Returns the response or the error
 // that should be returned to the caller
-func (r Request) Run() (msg proto.Message, replyError *Error) {
+func (r *Request) Run() (msg proto.Message, replyError *Error) {
 	r.StartedAt = time.Now()
 	ctx := r.Context
 	if r.StreamedReply() {
 		ctx = r.StreamContext
 	}
-	ctx = context.WithValue(ctx, RequestContextKey, &r)
+	ctx = context.WithValue(ctx, RequestContextKey, r)
 	msg, replyError = CaptureErrors(
 		func() (proto.Message, error) {
 			return r.Handler(ctx)
@@ -381,7 +381,7 @@ func (r *Request) setupStreamedReply() {
 }
 
 // StreamedReply returns true if the request reply is streamed
-func (r Request) StreamedReply() bool {
+func (r *Request) StreamedReply() bool {
 	return r.isStreamedReply
 }
 
