@@ -145,7 +145,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 				Message: "bad request received: " + err.Error(),
 			}
 		} else {
-			request.SetupStreamedReply()
+			request.EnableStreamedReply()
 			request.Handler = func(ctx context.Context)(proto.Message, error){
 				err := h.server.MtStreamedReply(ctx, req, func(rep SimpleStringReply){
 					request.SendStreamReply(&rep)
@@ -167,7 +167,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 				Message: "bad request received: " + err.Error(),
 			}
 		} else {
-			request.SetupStreamedReply()
+			request.EnableStreamedReply()
 			request.Handler = func(ctx context.Context)(proto.Message, error){
 				err := h.server.MtVoidReqStreamedReply(ctx, func(rep SimpleStringReply){
 					request.SendStreamReply(&rep)
@@ -471,7 +471,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 				Message: "bad request received: " + err.Error(),
 			}
 		} else {
-			request.SetupStreamedReply()
+			request.EnableStreamedReply()
 			request.Handler = func(ctx context.Context)(proto.Message, error){
 				err := h.server.MtStreamedReplyWithSubjectParams(ctx, mtParams[0], mtParams[1], func(rep SimpleStringReply){
 					request.SendStreamReply(&rep)

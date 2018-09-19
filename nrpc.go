@@ -261,10 +261,12 @@ type Request struct {
 	Context context.Context
 	Conn    NatsConn
 
+	isStreamedReply bool
 	KeepStreamAlive *KeepStreamAlive
 	StreamContext   context.Context
 	StreamCancel    func()
 	StreamMsgCount  uint32
+	streamLock      sync.Mutex
 
 	Subject     string
 	MethodName  string
@@ -309,6 +311,9 @@ func (r Request) Run() (msg proto.Message, replyError *Error) {
 // RunAndReply calls Run() and send the reply back to the caller
 func (r *Request) RunAndReply() {
 	var failed, replyFailed bool
+	// In case RunAndReply was called directly, we may need to initialize the
+	// streamed reply
+	r.setupStreamedReply()
 	resp, replyError := r.Run()
 	if replyError != nil {
 		failed = true
@@ -357,8 +362,19 @@ func (r *Request) SetServiceParam(key, value string) {
 	r.ServiceParams[key] = value
 }
 
-// SetupStreamedReply initializes the reply stream
-func (r *Request) SetupStreamedReply() {
+// EnableStreamedReply enables the streamed reply mode
+func (r *Request) EnableStreamedReply() {
+	r.isStreamedReply = true
+}
+
+// setupStreamedReply initializes the reply stream if needed.
+func (r *Request) setupStreamedReply() {
+	r.streamLock.Lock()
+	defer r.streamLock.Unlock()
+
+	if !r.StreamedReply() || r.KeepStreamAlive != nil {
+		return
+	}
 	r.StreamContext, r.StreamCancel = context.WithCancel(r.Context)
 	r.KeepStreamAlive = NewKeepStreamAlive(
 		r.Conn, r.ReplySubject, r.Encoding, r.StreamCancel)
@@ -366,7 +382,7 @@ func (r *Request) SetupStreamedReply() {
 
 // StreamedReply returns true if the request reply is streamed
 func (r Request) StreamedReply() bool {
-	return r.KeepStreamAlive != nil
+	return r.isStreamedReply
 }
 
 // SendStreamReply send a reply a part of a stream
@@ -751,6 +767,9 @@ func (pool *WorkerPool) scheduler() {
 
 			log.Printf("scheduler: got a request. Deadline in=%s", deadline.Sub(now))
 			if deadline.After(now) {
+				// Safety call to setupStreamedReply in case QueueRequest had
+				// to time to do it yet
+				request.setupStreamedReply()
 				log.Printf("scheduler: try scheduling")
 				select {
 				case pool.schedule <- request:
@@ -837,6 +856,7 @@ func (pool *WorkerPool) SetSize(size uint) {
 func (pool *WorkerPool) QueueRequest(request *Request) error {
 	select {
 	case pool.getQueue() <- request:
+		request.setupStreamedReply()
 		return nil
 	default:
 		return request.SendErrorTooBusy("too many pending requests")

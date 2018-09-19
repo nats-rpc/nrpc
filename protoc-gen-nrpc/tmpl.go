@@ -229,7 +229,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 {{- end}}
 		} else {
 			{{- if HasStreamedReply .}}
-			request.SetupStreamedReply()
+			request.EnableStreamedReply()
 			request.Handler = func(ctx context.Context)(proto.Message, error){
 				err := h.server.{{.GetName}}(ctx
 				{{- range $i, $p := GetMethodSubjectParams . -}}
