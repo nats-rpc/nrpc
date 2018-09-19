@@ -854,8 +854,8 @@ func (pool *WorkerPool) Close(timeout time.Duration) {
 	}
 
 	// Now wait for the workers to stop and cancel the context if they don't
-	close(pool.schedule)
 	timer := time.AfterFunc(timeout, pool.contextCancel)
 	pool.waitGroup.Wait()
 	timer.Stop()
+	close(pool.schedule)
 }
