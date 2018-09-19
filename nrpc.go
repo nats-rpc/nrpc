@@ -739,7 +739,10 @@ func (pool *WorkerPool) scheduler() {
 	queueLoop:
 		for request := range queue {
 			now := time.Now()
+
+			pool.m.Lock()
 			deadline := request.CreatedAt.Add(pool.maxPendingDuration)
+			pool.m.Unlock()
 
 			log.Printf("scheduler: got a request. Deadline in=%s", deadline.Sub(now))
 			if deadline.After(now) {
@@ -795,8 +798,11 @@ func (pool *WorkerPool) SetMaxPending(value uint) {
 	close(oldQueue)
 }
 
+// SetMaxPendingDuration changes the max pending delay
 func (pool *WorkerPool) SetMaxPendingDuration(value time.Duration) {
+	pool.m.Lock()
 	pool.maxPendingDuration = value
+	pool.m.Unlock()
 }
 
 // SetSize changes the number of workers
