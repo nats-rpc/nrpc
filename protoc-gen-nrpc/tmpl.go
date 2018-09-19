@@ -314,7 +314,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 
 	if immediateError != nil {
 		if err := request.SendReply(nil, immediateError); err != nil {
-			log.Println("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
+			log.Printf("{{.GetName}}Handler: {{.GetName}} handler failed to publish the response: %s", err)
 {{- if Prometheus}}
 			serverRequestsFor{{$serviceName}}.WithLabelValues(
 				request.MethodName, request.Encoding, "handler_fail").Inc()

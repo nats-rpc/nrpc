@@ -196,7 +196,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 
 	if immediateError != nil {
 		if err := request.SendReply(nil, immediateError); err != nil {
-			log.Println("SvcCustomSubjectHandler: SvcCustomSubject handler failed to publish the response: %s", err)
+			log.Printf("SvcCustomSubjectHandler: SvcCustomSubject handler failed to publish the response: %s", err)
 		}
 	} else {
 	}
@@ -526,7 +526,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 
 	if immediateError != nil {
 		if err := request.SendReply(nil, immediateError); err != nil {
-			log.Println("SvcSubjectParamsHandler: SvcSubjectParams handler failed to publish the response: %s", err)
+			log.Printf("SvcSubjectParamsHandler: SvcSubjectParams handler failed to publish the response: %s", err)
 		}
 	} else {
 	}

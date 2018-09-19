@@ -180,7 +180,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 
 	if immediateError != nil {
 		if err := request.SendReply(nil, immediateError); err != nil {
-			log.Println("GreeterHandler: Greeter handler failed to publish the response: %s", err)
+			log.Printf("GreeterHandler: Greeter handler failed to publish the response: %s", err)
 			serverRequestsForGreeter.WithLabelValues(
 				request.MethodName, request.Encoding, "handler_fail").Inc()
 		}
