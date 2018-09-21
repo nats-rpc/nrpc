@@ -9,11 +9,15 @@ import (
 	"log"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/go-nats"
 )
+
+// ContextKey type for storing values into context.Context
+type ContextKey int
 
 // ErrStreamInvalidMsgCount is when a stream reply gets a wrong number of messages
 var ErrStreamInvalidMsgCount = errors.New("Stream reply received an incorrect number of messages")
@@ -228,6 +232,193 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 	}
 
 	return nil
+}
+
+const (
+	// RequestContextKey is the key for string the request into the context
+	RequestContextKey ContextKey = iota
+)
+
+// NewRequest creates a Request instance
+func NewRequest(ctx context.Context, conn NatsConn, subject string, replySubject string) *Request {
+	return &Request{
+		Context:      ctx,
+		Conn:         conn,
+		Subject:      subject,
+		ReplySubject: replySubject,
+		CreatedAt:    time.Now(),
+	}
+}
+
+// GetRequest returns the Request associated with a context, or nil if absent
+func GetRequest(ctx context.Context) *Request {
+	request, _ := ctx.Value(RequestContextKey).(*Request)
+	return request
+}
+
+// Request is a server-side incoming request
+type Request struct {
+	Context context.Context
+	Conn    NatsConn
+
+	isStreamedReply bool
+	KeepStreamAlive *KeepStreamAlive
+	StreamContext   context.Context
+	StreamCancel    func()
+	StreamMsgCount  uint32
+	streamLock      sync.Mutex
+
+	Subject     string
+	MethodName  string
+	SubjectTail []string
+
+	CreatedAt time.Time
+	StartedAt time.Time
+
+	Encoding     string
+	NoReply      bool
+	ReplySubject string
+
+	PackageParams map[string]string
+	ServiceParams map[string]string
+
+	AfterReply func(r *Request, success bool, replySuccess bool)
+
+	Handler func(context.Context) (proto.Message, error)
+}
+
+// Elapsed duration since request was started
+func (r *Request) Elapsed() time.Duration {
+	return time.Since(r.CreatedAt)
+}
+
+// Run the handler and capture any error. Returns the response or the error
+// that should be returned to the caller
+func (r *Request) Run() (msg proto.Message, replyError *Error) {
+	r.StartedAt = time.Now()
+	ctx := r.Context
+	if r.StreamedReply() {
+		ctx = r.StreamContext
+	}
+	ctx = context.WithValue(ctx, RequestContextKey, r)
+	msg, replyError = CaptureErrors(
+		func() (proto.Message, error) {
+			return r.Handler(ctx)
+		})
+	return
+}
+
+// RunAndReply calls Run() and send the reply back to the caller
+func (r *Request) RunAndReply() {
+	var failed, replyFailed bool
+	// In case RunAndReply was called directly, we may need to initialize the
+	// streamed reply
+	r.setupStreamedReply()
+	resp, replyError := r.Run()
+	if replyError != nil {
+		failed = true
+		log.Printf("%s handler failed: %s", r.MethodName, replyError)
+	}
+	if !r.NoReply {
+		if err := r.SendReply(resp, replyError); err != nil {
+			replyFailed = true
+			log.Printf("%s failed to publish the response: %s", r.MethodName, err)
+		}
+	}
+	if r.AfterReply != nil {
+		r.AfterReply(r, !failed, !replyFailed)
+	}
+}
+
+// PackageParam returns a package parameter value, or "" if absent
+func (r *Request) PackageParam(key string) string {
+	if r == nil || r.PackageParams == nil {
+		return ""
+	}
+	return r.PackageParams[key]
+}
+
+// ServiceParam returns a package parameter value, or "" if absent
+func (r *Request) ServiceParam(key string) string {
+	if r == nil || r.ServiceParams == nil {
+		return ""
+	}
+	return r.ServiceParams[key]
+}
+
+// SetPackageParam sets a package param value
+func (r *Request) SetPackageParam(key, value string) {
+	if r.PackageParams == nil {
+		r.PackageParams = make(map[string]string)
+	}
+	r.PackageParams[key] = value
+}
+
+// SetServiceParam sets a service param value
+func (r *Request) SetServiceParam(key, value string) {
+	if r.ServiceParams == nil {
+		r.ServiceParams = make(map[string]string)
+	}
+	r.ServiceParams[key] = value
+}
+
+// EnableStreamedReply enables the streamed reply mode
+func (r *Request) EnableStreamedReply() {
+	r.isStreamedReply = true
+}
+
+// setupStreamedReply initializes the reply stream if needed.
+func (r *Request) setupStreamedReply() {
+	r.streamLock.Lock()
+	defer r.streamLock.Unlock()
+
+	if !r.StreamedReply() || r.KeepStreamAlive != nil {
+		return
+	}
+	r.StreamContext, r.StreamCancel = context.WithCancel(r.Context)
+	r.KeepStreamAlive = NewKeepStreamAlive(
+		r.Conn, r.ReplySubject, r.Encoding, r.StreamCancel)
+}
+
+// StreamedReply returns true if the request reply is streamed
+func (r *Request) StreamedReply() bool {
+	return r.isStreamedReply
+}
+
+// SendStreamReply send a reply a part of a stream
+func (r *Request) SendStreamReply(msg proto.Message) {
+	if err := r.sendReply(msg, nil); err != nil {
+		log.Printf("nrpc: error publishing response: %s", err)
+		r.StreamCancel()
+		return
+	}
+	r.StreamMsgCount++
+}
+
+// SendReply sends a reply to the caller
+func (r *Request) SendReply(resp proto.Message, withError *Error) error {
+	if r.StreamedReply() {
+		r.KeepStreamAlive.Stop()
+		if withError == nil {
+			return r.sendReply(
+				nil, &Error{Type: Error_EOS, MsgCount: r.StreamMsgCount},
+			)
+		}
+	}
+	return r.sendReply(resp, withError)
+}
+
+// sendReply sends a reply to the caller
+func (r *Request) sendReply(resp proto.Message, withError *Error) error {
+	return Publish(resp, withError, r.Conn, r.ReplySubject, r.Encoding)
+}
+
+// SendErrorTooBusy cancels the request with a 'SERVERTOOBUSY' error
+func (r *Request) SendErrorTooBusy(msg string) error {
+	return r.SendReply(nil, &Error{
+		Type:    Error_SERVERTOOBUSY,
+		Message: msg,
+	})
 }
 
 var ErrEOS = errors.New("End of stream")
@@ -511,4 +702,176 @@ func (k *KeepStreamAlive) loop() {
 			return
 		}
 	}
+}
+
+// WorkerPool is a poof of workers
+type WorkerPool struct {
+	Context       context.Context
+	contextCancel context.CancelFunc
+
+	queue     chan *Request
+	schedule  chan *Request
+	waitGroup sync.WaitGroup
+	m         sync.Mutex
+
+	size               uint
+	maxPending         uint
+	maxPendingDuration time.Duration
+}
+
+// NewWorkerPool creates a pool of workers
+func NewWorkerPool(
+	ctx context.Context,
+	size uint,
+	maxPending uint,
+	maxPendingDuration time.Duration,
+) *WorkerPool {
+	nCtx, cancel := context.WithCancel(ctx)
+	pool := WorkerPool{
+		Context:            nCtx,
+		contextCancel:      cancel,
+		queue:              make(chan *Request, maxPending),
+		schedule:           make(chan *Request),
+		maxPending:         maxPending,
+		maxPendingDuration: maxPendingDuration,
+	}
+	pool.waitGroup.Add(1)
+	go pool.scheduler()
+	pool.SetSize(size)
+	return &pool
+}
+
+func (pool *WorkerPool) getQueue() (queue chan *Request) {
+	pool.m.Lock()
+	queue = pool.queue
+	pool.m.Unlock()
+	return
+}
+
+func (pool *WorkerPool) scheduler() {
+	defer pool.waitGroup.Done()
+
+	for {
+		queue := pool.getQueue()
+		if queue == nil {
+			return
+		}
+	queueLoop:
+		for request := range queue {
+			now := time.Now()
+
+			pool.m.Lock()
+			deadline := request.CreatedAt.Add(pool.maxPendingDuration)
+			pool.m.Unlock()
+
+			if deadline.After(now) {
+				// Safety call to setupStreamedReply in case QueueRequest had
+				// to time to do it yet
+				request.setupStreamedReply()
+				select {
+				case pool.schedule <- request:
+					continue queueLoop
+				case <-time.After(deadline.Sub(now)):
+					// Too late
+				}
+			}
+			request.SendErrorTooBusy("No worker available")
+		}
+	}
+}
+
+func (pool *WorkerPool) worker() {
+	defer pool.waitGroup.Done()
+	for request := range pool.schedule {
+		if request == nil {
+			return
+		}
+		request.RunAndReply()
+	}
+}
+
+// SetMaxPending changes the queue size
+func (pool *WorkerPool) SetMaxPending(value uint) {
+	if pool.maxPending == value {
+		return
+	}
+	pool.m.Lock()
+	defer pool.m.Unlock()
+
+	oldQueue := pool.queue
+	pool.queue = make(chan *Request, value)
+	pool.maxPending = value
+
+	close(oldQueue)
+
+	// drain the old queue and cancel requests if there are too many
+	for request := range oldQueue {
+		select {
+		case pool.queue <- request:
+		default:
+			request.SendErrorTooBusy("too many pending requests")
+		}
+	}
+}
+
+// SetMaxPendingDuration changes the max pending delay
+func (pool *WorkerPool) SetMaxPendingDuration(value time.Duration) {
+	pool.m.Lock()
+	pool.maxPendingDuration = value
+	pool.m.Unlock()
+}
+
+// SetSize changes the number of workers
+func (pool *WorkerPool) SetSize(size uint) {
+	pool.m.Lock()
+	defer pool.m.Unlock()
+
+	if size == pool.size {
+		return
+	}
+	for size < pool.size {
+		pool.schedule <- nil
+		pool.size--
+	}
+	for size > pool.size {
+		pool.waitGroup.Add(1)
+		go pool.worker()
+		pool.size++
+	}
+}
+
+// QueueRequest adds a request to the queue
+// Send a SERVERTOOBUSY error to the client if the queue is full
+func (pool *WorkerPool) QueueRequest(request *Request) error {
+	select {
+	case pool.getQueue() <- request:
+		request.setupStreamedReply()
+		return nil
+	default:
+		return request.SendErrorTooBusy("too many pending requests")
+	}
+}
+
+// Close stops all the workers and wait for their completion
+// If the workers do not stop before the timeout, their context is canceled
+// Will never return if a request ignore the context
+func (pool *WorkerPool) Close(timeout time.Duration) {
+	// Stops all the workers so nothing more gets scheduled
+	pool.SetSize(0)
+
+	pool.m.Lock()
+	oldQueue := pool.queue
+	pool.queue = nil
+	pool.m.Unlock()
+
+	close(oldQueue)
+	for request := range oldQueue {
+		request.SendErrorTooBusy("Worker pool shutting down")
+	}
+
+	// Now wait for the workers to stop and cancel the context if they don't
+	timer := time.AfterFunc(timeout, pool.contextCancel)
+	pool.waitGroup.Wait()
+	timer.Stop()
+	close(pool.schedule)
 }
