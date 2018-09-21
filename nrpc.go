@@ -704,7 +704,7 @@ func (k *KeepStreamAlive) loop() {
 	}
 }
 
-// WorkerPool is a poof of workers
+// WorkerPool is a pool of workers
 type WorkerPool struct {
 	Context       context.Context
 	contextCancel context.CancelFunc
@@ -854,7 +854,7 @@ func (pool *WorkerPool) QueueRequest(request *Request) error {
 
 // Close stops all the workers and wait for their completion
 // If the workers do not stop before the timeout, their context is canceled
-// Will never return if a request ignore the context
+// Will never return if a request ignores the context
 func (pool *WorkerPool) Close(timeout time.Duration) {
 	// Stops all the workers so nothing more gets scheduled
 	pool.SetSize(0)
