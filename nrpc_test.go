@@ -320,7 +320,7 @@ func TestMarshalUnmarshalResponse(t *testing.T) {
 		})
 		t.Run("MarshalErrorResponse"+tt.encoding, func(t *testing.T) {
 			data, err := nrpc.MarshalErrorResponse(tt.encoding, &nrpc.Error{
-				Type: nrpc.Error_CLIENT, Message: "Some error",
+				Type: nrpc.Error_SERVER, Message: "Some error",
 			})
 			if err != nil {
 				t.Fatal("Unexpected error:", err)
@@ -331,17 +331,23 @@ func TestMarshalUnmarshalResponse(t *testing.T) {
 					t.Error("Expects payload to start with a '0', got", data[0])
 				}
 			case "json":
-				if string(data[:13]) != "{\"__error__\":" {
-					t.Error("Expects payload to start with '{\"__error__\":', got", string(data[:13]))
+				var expected = `{"__error__":{"type":"SERVER","message":"Some error"}}`
+				if string(data) != expected {
+					t.Errorf("Invalid json-encoded error. Expects %s, got %s", expected, string(data))
 				}
 			}
 			var msg DummyMessage
 			err = nrpc.UnmarshalResponse(tt.encoding, data, &msg)
+			if err == nil {
+				t.Errorf("Expected an error, got nil")
+				return
+			}
 			repErr, ok := err.(*nrpc.Error)
 			if !ok {
 				t.Errorf("Expected a nrpc.Error, got %#v", err)
+				return
 			}
-			if repErr.Type != nrpc.Error_CLIENT || repErr.Message != "Some error" {
+			if repErr.Type != nrpc.Error_SERVER || repErr.Message != "Some error" {
 				t.Errorf("Unexpected err: %#v", *repErr)
 			}
 		})

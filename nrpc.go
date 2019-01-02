@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/go-nats"
 )
@@ -52,7 +53,7 @@ func Unmarshal(encoding string, data []byte, msg proto.Message) error {
 	case "protobuf":
 		return proto.Unmarshal(data, msg)
 	case "json":
-		return json.Unmarshal(data, msg)
+		return jsonpb.UnmarshalString(string(data), msg)
 	default:
 		return errors.New("Invalid encoding: " + encoding)
 	}
@@ -71,13 +72,21 @@ func UnmarshalResponse(encoding string, data []byte, msg proto.Message) error {
 		return proto.Unmarshal(data, msg)
 	case "json":
 		if len(data) > 13 && bytes.Equal(data[:13], []byte("{\"__error__\":")) {
-			var rep map[string]*Error
+			var rep map[string]json.RawMessage
 			if err := json.Unmarshal(data, &rep); err != nil {
 				return err
 			}
-			return rep["__error__"]
+			errbuf, ok := rep["__error__"]
+			if !ok {
+				panic("invalid error message")
+			}
+			var nrpcErr Error
+			if err := jsonpb.UnmarshalString(string(errbuf), &nrpcErr); err != nil {
+				return err
+			}
+			return &nrpcErr
 		}
-		return json.Unmarshal(data, msg)
+		return jsonpb.UnmarshalString(string(data), msg)
 	default:
 		return errors.New("Invalid encoding: " + encoding)
 	}
@@ -88,7 +97,9 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 	case "protobuf":
 		return proto.Marshal(msg)
 	case "json":
-		return json.Marshal(msg)
+		buf := bytes.NewBuffer(nil)
+		err := new(jsonpb.Marshaler).Marshal(buf, msg)
+		return buf.Bytes(), err
 	default:
 		return nil, errors.New("Invalid encoding: " + encoding)
 	}
@@ -106,8 +117,13 @@ func MarshalErrorResponse(encoding string, repErr *Error) ([]byte, error) {
 		}
 		return pBuf.Bytes(), nil
 	case "json":
-		return json.Marshal(map[string]*Error{
-			"__error__": repErr,
+		buf := bytes.NewBuffer(nil)
+		err := new(jsonpb.Marshaler).Marshal(buf, repErr)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(map[string]json.RawMessage{
+			"__error__": json.RawMessage(buf.Bytes()),
 		})
 	default:
 		return nil, errors.New("Invalid encoding: " + encoding)
