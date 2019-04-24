@@ -28,6 +28,8 @@ type SvcCustomSubjectHandler struct {
 	workers *nrpc.WorkerPool
 	nc      nrpc.NatsConn
 	server  SvcCustomSubjectServer
+
+	encodings []string
 }
 
 func NewSvcCustomSubjectHandler(ctx context.Context, nc nrpc.NatsConn, s SvcCustomSubjectServer) *SvcCustomSubjectHandler {
@@ -35,6 +37,8 @@ func NewSvcCustomSubjectHandler(ctx context.Context, nc nrpc.NatsConn, s SvcCust
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
+
+		encodings: []string{"protobuf"},
 	}
 }
 
@@ -46,18 +50,31 @@ func NewSvcCustomSubjectConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.Nats
 	}
 }
 
+// SetEncodings sets the output encodings when using a '*Publish' function
+func (h *SvcCustomSubjectHandler) SetEncodings(encodings []string) {
+	h.encodings = encodings
+}
+
 func (h *SvcCustomSubjectHandler) Subject() string {
 	return "root.*.custom_subject.>"
 }
 
 func (h *SvcCustomSubjectHandler) MtNoRequestPublish(pkginstance string, msg SimpleStringReply) error {
-	rawMsg, err := nrpc.Marshal("protobuf", &msg)
-	if err != nil {
-		log.Printf("SvcCustomSubjectHandler.MtNoRequestPublish: error marshaling the message: %s", err)
-		return err
+	for _, encoding := range h.encodings {
+		rawMsg, err := nrpc.Marshal(encoding, &msg)
+		if err != nil {
+			log.Printf("SvcCustomSubjectHandler.MtNoRequestPublish: error marshaling the message: %s", err)
+			return err
+		}
+		subject := "root." + pkginstance + "."+ "custom_subject."+ "mtnorequest"
+		if encoding != "protobuf" {
+			subject += "." + encoding
+		}
+		if err := h.nc.Publish(subject, rawMsg); err != nil {
+			return err
+		}
 	}
-	subject := "root." + pkginstance + "."+ "custom_subject."+ "mtnorequest"
-	return h.nc.Publish(subject, rawMsg)
+	return nil
 }
 
 func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
@@ -252,11 +269,17 @@ func (c *SvcCustomSubjectClient) MtVoidReply(req StringArg) (err error) {
 func (c *SvcCustomSubjectClient) MtNoRequestSubject(
 	
 ) string {
-	return c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtnorequest"
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtnorequest"
+	if c.Encoding != "protobuf" {
+		subject += "." + c.Encoding
+	}
+	return subject
 }
 
 type SvcCustomSubjectMtNoRequestSubscription struct {
 	*nats.Subscription
+	
+	encoding string
 }
 
 func (s *SvcCustomSubjectMtNoRequestSubscription) Next(timeout time.Duration) (next SimpleStringReply, err error) {
@@ -264,7 +287,7 @@ func (s *SvcCustomSubjectMtNoRequestSubscription) Next(timeout time.Duration) (n
 	if err != nil {
 		return
 	}
-	err = nrpc.Unmarshal("protobuf", msg.Data, &next)
+	err = nrpc.Unmarshal(s.encoding, msg.Data, &next)
 	return
 }
 
@@ -278,7 +301,7 @@ func (c *SvcCustomSubjectClient) MtNoRequestSubscribeSync(
 	if err != nil {
 		return
 	}
-	sub = &SvcCustomSubjectMtNoRequestSubscription{natsSub}
+	sub = &SvcCustomSubjectMtNoRequestSubscription{natsSub, c.Encoding}
 	return
 }
 
@@ -291,7 +314,7 @@ func (c *SvcCustomSubjectClient) MtNoRequestSubscribe(
 	)
 	sub, err = c.nc.Subscribe(subject, func(msg *nats.Msg){
 		var pmsg SimpleStringReply
-		err := nrpc.Unmarshal("protobuf", msg.Data, &pmsg)
+		err := nrpc.Unmarshal(c.Encoding, msg.Data, &pmsg)
 		if err != nil {
 			log.Printf("SvcCustomSubjectClient.MtNoRequestSubscribe: Error decoding, %s", err)
 			return
@@ -377,6 +400,8 @@ type SvcSubjectParamsHandler struct {
 	workers *nrpc.WorkerPool
 	nc      nrpc.NatsConn
 	server  SvcSubjectParamsServer
+
+	encodings []string
 }
 
 func NewSvcSubjectParamsHandler(ctx context.Context, nc nrpc.NatsConn, s SvcSubjectParamsServer) *SvcSubjectParamsHandler {
@@ -384,6 +409,8 @@ func NewSvcSubjectParamsHandler(ctx context.Context, nc nrpc.NatsConn, s SvcSubj
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
+
+		encodings: []string{"protobuf"},
 	}
 }
 
@@ -395,18 +422,31 @@ func NewSvcSubjectParamsConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.Nats
 	}
 }
 
+// SetEncodings sets the output encodings when using a '*Publish' function
+func (h *SvcSubjectParamsHandler) SetEncodings(encodings []string) {
+	h.encodings = encodings
+}
+
 func (h *SvcSubjectParamsHandler) Subject() string {
 	return "root.*.svcsubjectparams.*.>"
 }
 
 func (h *SvcSubjectParamsHandler) MtNoRequestWParamsPublish(pkginstance string, svcclientid string, mtmp1 string, msg SimpleStringReply) error {
-	rawMsg, err := nrpc.Marshal("protobuf", &msg)
-	if err != nil {
-		log.Printf("SvcSubjectParamsHandler.MtNoRequestWParamsPublish: error marshaling the message: %s", err)
-		return err
+	for _, encoding := range h.encodings {
+		rawMsg, err := nrpc.Marshal(encoding, &msg)
+		if err != nil {
+			log.Printf("SvcSubjectParamsHandler.MtNoRequestWParamsPublish: error marshaling the message: %s", err)
+			return err
+		}
+		subject := "root." + pkginstance + "."+ "svcsubjectparams." + svcclientid + "."+ "mtnorequestwparams" + "." + mtmp1
+		if encoding != "protobuf" {
+			subject += "." + encoding
+		}
+		if err := h.nc.Publish(subject, rawMsg); err != nil {
+			return err
+		}
 	}
-	subject := "root." + pkginstance + "."+ "svcsubjectparams." + svcclientid + "."+ "mtnorequestwparams" + "." + mtmp1
-	return h.nc.Publish(subject, rawMsg)
+	return nil
 }
 
 func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
@@ -611,11 +651,17 @@ func (c *SvcSubjectParamsClient) MtNoReply() (err error) {
 func (c *SvcSubjectParamsClient) MtNoRequestWParamsSubject(
 	mtmp1 string,
 ) string {
-	return c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtnorequestwparams" + "." + mtmp1
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtnorequestwparams" + "." + mtmp1
+	if c.Encoding != "protobuf" {
+		subject += "." + c.Encoding
+	}
+	return subject
 }
 
 type SvcSubjectParamsMtNoRequestWParamsSubscription struct {
 	*nats.Subscription
+	
+	encoding string
 }
 
 func (s *SvcSubjectParamsMtNoRequestWParamsSubscription) Next(timeout time.Duration) (next SimpleStringReply, err error) {
@@ -623,7 +669,7 @@ func (s *SvcSubjectParamsMtNoRequestWParamsSubscription) Next(timeout time.Durat
 	if err != nil {
 		return
 	}
-	err = nrpc.Unmarshal("protobuf", msg.Data, &next)
+	err = nrpc.Unmarshal(s.encoding, msg.Data, &next)
 	return
 }
 
@@ -637,7 +683,7 @@ func (c *SvcSubjectParamsClient) MtNoRequestWParamsSubscribeSync(
 	if err != nil {
 		return
 	}
-	sub = &SvcSubjectParamsMtNoRequestWParamsSubscription{natsSub}
+	sub = &SvcSubjectParamsMtNoRequestWParamsSubscription{natsSub, c.Encoding}
 	return
 }
 
@@ -650,7 +696,7 @@ func (c *SvcSubjectParamsClient) MtNoRequestWParamsSubscribe(
 	)
 	sub, err = c.nc.Subscribe(subject, func(msg *nats.Msg){
 		var pmsg SimpleStringReply
-		err := nrpc.Unmarshal("protobuf", msg.Data, &pmsg)
+		err := nrpc.Unmarshal(c.Encoding, msg.Data, &pmsg)
 		if err != nil {
 			log.Printf("SvcSubjectParamsClient.MtNoRequestWParamsSubscribe: Error decoding, %s", err)
 			return
@@ -682,6 +728,8 @@ type NoRequestServiceHandler struct {
 	workers *nrpc.WorkerPool
 	nc      nrpc.NatsConn
 	server  NoRequestServiceServer
+
+	encodings []string
 }
 
 func NewNoRequestServiceHandler(ctx context.Context, nc nrpc.NatsConn, s NoRequestServiceServer) *NoRequestServiceHandler {
@@ -689,6 +737,8 @@ func NewNoRequestServiceHandler(ctx context.Context, nc nrpc.NatsConn, s NoReque
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
+
+		encodings: []string{"protobuf"},
 	}
 }
 
@@ -700,18 +750,31 @@ func NewNoRequestServiceConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.Nats
 	}
 }
 
+// SetEncodings sets the output encodings when using a '*Publish' function
+func (h *NoRequestServiceHandler) SetEncodings(encodings []string) {
+	h.encodings = encodings
+}
+
 func (h *NoRequestServiceHandler) Subject() string {
 	return "root.*.norequestservice.>"
 }
 
 func (h *NoRequestServiceHandler) MtNoRequestPublish(pkginstance string, msg SimpleStringReply) error {
-	rawMsg, err := nrpc.Marshal("protobuf", &msg)
-	if err != nil {
-		log.Printf("NoRequestServiceHandler.MtNoRequestPublish: error marshaling the message: %s", err)
-		return err
+	for _, encoding := range h.encodings {
+		rawMsg, err := nrpc.Marshal(encoding, &msg)
+		if err != nil {
+			log.Printf("NoRequestServiceHandler.MtNoRequestPublish: error marshaling the message: %s", err)
+			return err
+		}
+		subject := "root." + pkginstance + "."+ "norequestservice."+ "mtnorequest"
+		if encoding != "protobuf" {
+			subject += "." + encoding
+		}
+		if err := h.nc.Publish(subject, rawMsg); err != nil {
+			return err
+		}
 	}
-	subject := "root." + pkginstance + "."+ "norequestservice."+ "mtnorequest"
-	return h.nc.Publish(subject, rawMsg)
+	return nil
 }
 
 type NoRequestServiceClient struct {
@@ -737,11 +800,17 @@ func NewNoRequestServiceClient(nc nrpc.NatsConn, pkgParaminstance string) *NoReq
 func (c *NoRequestServiceClient) MtNoRequestSubject(
 	
 ) string {
-	return c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtnorequest"
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtnorequest"
+	if c.Encoding != "protobuf" {
+		subject += "." + c.Encoding
+	}
+	return subject
 }
 
 type NoRequestServiceMtNoRequestSubscription struct {
 	*nats.Subscription
+	
+	encoding string
 }
 
 func (s *NoRequestServiceMtNoRequestSubscription) Next(timeout time.Duration) (next SimpleStringReply, err error) {
@@ -749,7 +818,7 @@ func (s *NoRequestServiceMtNoRequestSubscription) Next(timeout time.Duration) (n
 	if err != nil {
 		return
 	}
-	err = nrpc.Unmarshal("protobuf", msg.Data, &next)
+	err = nrpc.Unmarshal(s.encoding, msg.Data, &next)
 	return
 }
 
@@ -763,7 +832,7 @@ func (c *NoRequestServiceClient) MtNoRequestSubscribeSync(
 	if err != nil {
 		return
 	}
-	sub = &NoRequestServiceMtNoRequestSubscription{natsSub}
+	sub = &NoRequestServiceMtNoRequestSubscription{natsSub, c.Encoding}
 	return
 }
 
@@ -776,7 +845,7 @@ func (c *NoRequestServiceClient) MtNoRequestSubscribe(
 	)
 	sub, err = c.nc.Subscribe(subject, func(msg *nats.Msg){
 		var pmsg SimpleStringReply
-		err := nrpc.Unmarshal("protobuf", msg.Data, &pmsg)
+		err := nrpc.Unmarshal(c.Encoding, msg.Data, &pmsg)
 		if err != nil {
 			log.Printf("NoRequestServiceClient.MtNoRequestSubscribe: Error decoding, %s", err)
 			return

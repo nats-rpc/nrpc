@@ -110,6 +110,8 @@ type {{.GetName}}Handler struct {
 	workers *nrpc.WorkerPool
 	nc      nrpc.NatsConn
 	server  {{.GetName}}Server
+
+	encodings []string
 }
 
 func New{{.GetName}}Handler(ctx context.Context, nc nrpc.NatsConn, s {{.GetName}}Server) *{{.GetName}}Handler {
@@ -117,6 +119,8 @@ func New{{.GetName}}Handler(ctx context.Context, nc nrpc.NatsConn, s {{.GetName}
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
+
+		encodings: []string{"protobuf"},
 	}
 }
 
@@ -126,6 +130,11 @@ func New{{.GetName}}ConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.NatsConn
 		nc:      nc,
 		server:  s,
 	}
+}
+
+// SetEncodings sets the output encodings when using a '*Publish' function
+func (h *{{.GetName}}Handler) SetEncodings(encodings []string) {
+	h.encodings = encodings
 }
 
 func (h *{{.GetName}}Handler) Subject() string {
@@ -150,18 +159,26 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 	{{- range $serviceSubjectParams}}svc{{.}} string, {{end -}}
 	{{- range GetMethodSubjectParams .}}mt{{.}} string, {{end -}}
 	msg {{GoType .GetOutputType}}) error {
-	rawMsg, err := nrpc.Marshal("protobuf", &msg)
-	if err != nil {
-		log.Printf("{{$serviceName}}Handler.{{.GetName}}Publish: error marshaling the message: %s", err)
-		return err
+	for _, encoding := range h.encodings {
+		rawMsg, err := nrpc.Marshal(encoding, &msg)
+		if err != nil {
+			log.Printf("{{$serviceName}}Handler.{{.GetName}}Publish: error marshaling the message: %s", err)
+			return err
+		}
+		subject := "{{$pkgSubject}}."
+		{{- range $pkgSubjectParams}} + pkg{{.}} + "."{{end -}}
+		+ "{{$serviceSubject}}."
+		{{- range $serviceSubjectParams}} + svc{{.}} + "."{{end -}}
+		+ "{{GetMethodSubject .}}"
+		{{- range GetMethodSubjectParams .}} + "." + mt{{.}}{{end}}
+		if encoding != "protobuf" {
+			subject += "." + encoding
+		}
+		if err := h.nc.Publish(subject, rawMsg); err != nil {
+			return err
+		}
 	}
-	subject := "{{$pkgSubject}}."
-	{{- range $pkgSubjectParams}} + pkg{{.}} + "."{{end -}}
-	+ "{{$serviceSubject}}."
-	{{- range $serviceSubjectParams}} + svc{{.}} + "."{{end -}}
-	+ "{{GetMethodSubject .}}"
-	{{- range GetMethodSubjectParams .}} + "." + mt{{.}}{{end}}
-	return h.nc.Publish(subject, rawMsg)
+	return nil
 }
 {{- end}}
 {{- end}}
@@ -378,7 +395,7 @@ func New{{.GetName}}Client(nc nrpc.NatsConn
 func (c *{{$serviceName}}Client) {{.GetName}}Subject(
 	{{range GetMethodSubjectParams .}}mt{{.}} string,{{end}}
 ) string {
-	return {{ if ne 0 (len $pkgSubject) -}}
+	subject := {{ if ne 0 (len $pkgSubject) -}}
 		c.PkgSubject + "." + {{end}}
 	{{- range $pkgSubjectParams -}}
 		c.PkgParam{{.}} + "." + {{end -}}
@@ -386,10 +403,16 @@ func (c *{{$serviceName}}Client) {{.GetName}}Subject(
 		c.SvcParam{{.}} + "." + {{end -}}
 	"{{GetMethodSubject .}}"
 	{{- range GetMethodSubjectParams .}} + "." + mt{{.}}{{end}}
+	if c.Encoding != "protobuf" {
+		subject += "." + c.Encoding
+	}
+	return subject
 }
 
 type {{$serviceName}}{{.GetName}}Subscription struct {
 	*nats.Subscription
+	
+	encoding string
 }
 
 func (s *{{$serviceName}}{{.GetName}}Subscription) Next(timeout time.Duration) (next {{GoType .GetOutputType}}, err error) {
@@ -397,7 +420,7 @@ func (s *{{$serviceName}}{{.GetName}}Subscription) Next(timeout time.Duration) (
 	if err != nil {
 		return
 	}
-	err = nrpc.Unmarshal("protobuf", msg.Data, &next)
+	err = nrpc.Unmarshal(s.encoding, msg.Data, &next)
 	return
 }
 
@@ -411,7 +434,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}SubscribeSync(
 	if err != nil {
 		return
 	}
-	sub = &{{$serviceName}}{{.GetName}}Subscription{natsSub}
+	sub = &{{$serviceName}}{{.GetName}}Subscription{natsSub, c.Encoding}
 	return
 }
 
@@ -424,7 +447,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}Subscribe(
 	)
 	sub, err = c.nc.Subscribe(subject, func(msg *nats.Msg){
 		var pmsg {{GoType .GetOutputType}}
-		err := nrpc.Unmarshal("protobuf", msg.Data, &pmsg)
+		err := nrpc.Unmarshal(c.Encoding, msg.Data, &pmsg)
 		if err != nil {
 			log.Printf("{{$serviceName}}Client.{{.GetName}}Subscribe: Error decoding, %s", err)
 			return

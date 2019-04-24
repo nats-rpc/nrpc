@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
 	"github.com/nats-rpc/nrpc"
+	"gotest.tools/assert"
 )
 
 type TestingLogWriter struct {
@@ -116,6 +117,42 @@ func TestAll(t *testing.T) {
 	}
 
 	log.SetOutput(TestingLogWriter{t})
+
+	t.Run("MultiProtocolPublish", func(t *testing.T) {
+		log.SetOutput(TestingLogWriter{t})
+		handler := NewSvcCustomSubjectHandler(context.Background(), c, BasicServerImpl{t, nil, nil})
+		handler.SetEncodings([]string{"protobuf", "json"})
+
+		c1 := NewSvcCustomSubjectClient(c, "default")
+
+		for _, protocol := range []string{"protobuf", "json"} {
+			t.Run(protocol, func(t *testing.T) {
+				c1.Encoding = protocol
+				if protocol == "protobuf" {
+					assert.Equal(t, "root.default.custom_subject.mtnorequest", c1.MtNoRequestSubject())
+				} else {
+					assert.Equal(t, "root.default.custom_subject.mtnorequest."+protocol, c1.MtNoRequestSubject())
+				}
+				sub, err := c1.MtNoRequestSubscribeSync()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer sub.Unsubscribe()
+
+				if err := handler.MtNoRequestPublish(
+					"default", SimpleStringReply{Reply: "test"},
+				); err != nil {
+					t.Fatal(t)
+				}
+
+				msg, err := sub.Next(time.Second)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, "test", msg.GetReply())
+			})
+		}
+	})
 
 	t.Run("NoConcurrency", func(t *testing.T) {
 		log.SetOutput(TestingLogWriter{t})
@@ -274,6 +311,8 @@ func commonTests(
 	encoding string,
 ) func(t *testing.T) {
 	return func(t *testing.T) {
+		handler1.SetEncodings([]string{encoding})
+		handler2.SetEncodings([]string{encoding})
 		s, err := conn.QueueSubscribe(handler1.Subject(), "queue", handler1.Handler)
 		if err != nil {
 			t.Fatal(err)
