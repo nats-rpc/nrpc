@@ -24,6 +24,8 @@ type GreeterHandler struct {
 	workers *nrpc.WorkerPool
 	nc      nrpc.NatsConn
 	server  GreeterServer
+
+	encodings []string
 }
 
 func NewGreeterHandler(ctx context.Context, nc nrpc.NatsConn, s GreeterServer) *GreeterHandler {
@@ -31,6 +33,8 @@ func NewGreeterHandler(ctx context.Context, nc nrpc.NatsConn, s GreeterServer) *
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
+
+		encodings: []string{"protobuf"},
 	}
 }
 
@@ -40,6 +44,11 @@ func NewGreeterConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.NatsConn, s G
 		nc:      nc,
 		server:  s,
 	}
+}
+
+// SetEncodings sets the output encodings when using a '*Publish' function
+func (h *GreeterHandler) SetEncodings(encodings []string) {
+	h.encodings = encodings
 }
 
 func (h *GreeterHandler) Subject() string {
