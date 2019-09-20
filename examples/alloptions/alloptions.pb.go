@@ -3,10 +3,12 @@
 
 package main
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
-import _ "github.com/nats-rpc/nrpc"
+import (
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	_ "github.com/nats-rpc/nrpc"
+	math "math"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -17,7 +19,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type StringArg struct {
 	Arg1                 string   `protobuf:"bytes,1,opt,name=arg1,proto3" json:"arg1,omitempty"`
@@ -30,16 +32,17 @@ func (m *StringArg) Reset()         { *m = StringArg{} }
 func (m *StringArg) String() string { return proto.CompactTextString(m) }
 func (*StringArg) ProtoMessage()    {}
 func (*StringArg) Descriptor() ([]byte, []int) {
-	return fileDescriptor_alloptions_701d989e418950a7, []int{0}
+	return fileDescriptor_ea5e80d0b81a3163, []int{0}
 }
+
 func (m *StringArg) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StringArg.Unmarshal(m, b)
 }
 func (m *StringArg) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_StringArg.Marshal(b, m, deterministic)
 }
-func (dst *StringArg) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StringArg.Merge(dst, src)
+func (m *StringArg) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StringArg.Merge(m, src)
 }
 func (m *StringArg) XXX_Size() int {
 	return xxx_messageInfo_StringArg.Size(m)
@@ -68,16 +71,17 @@ func (m *SimpleStringReply) Reset()         { *m = SimpleStringReply{} }
 func (m *SimpleStringReply) String() string { return proto.CompactTextString(m) }
 func (*SimpleStringReply) ProtoMessage()    {}
 func (*SimpleStringReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_alloptions_701d989e418950a7, []int{1}
+	return fileDescriptor_ea5e80d0b81a3163, []int{1}
 }
+
 func (m *SimpleStringReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SimpleStringReply.Unmarshal(m, b)
 }
 func (m *SimpleStringReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SimpleStringReply.Marshal(b, m, deterministic)
 }
-func (dst *SimpleStringReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SimpleStringReply.Merge(dst, src)
+func (m *SimpleStringReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SimpleStringReply.Merge(m, src)
 }
 func (m *SimpleStringReply) XXX_Size() int {
 	return xxx_messageInfo_SimpleStringReply.Size(m)
@@ -100,9 +104,9 @@ func init() {
 	proto.RegisterType((*SimpleStringReply)(nil), "main.SimpleStringReply")
 }
 
-func init() { proto.RegisterFile("alloptions.proto", fileDescriptor_alloptions_701d989e418950a7) }
+func init() { proto.RegisterFile("alloptions.proto", fileDescriptor_ea5e80d0b81a3163) }
 
-var fileDescriptor_alloptions_701d989e418950a7 = []byte{
+var fileDescriptor_ea5e80d0b81a3163 = []byte{
 	// 429 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x53, 0x31, 0x6f, 0xd4, 0x30,
 	0x14, 0x6e, 0xe0, 0x80, 0xde, 0x83, 0x36, 0x87, 0x8b, 0x20, 0x17, 0x21, 0x51, 0x85, 0xa5, 0x48,
