@@ -7,7 +7,7 @@ nRPC is an RPC framework like [gRPC](https://grpc.io/), but for
 
 It can generate a Go client and server from the same .proto file that you'd
 use to generate gRPC clients and servers. The server is generated as a NATS
-[MsgHandler](https://godoc.org/github.com/nats-io/go-nats#MsgHandler).
+[MsgHandler](https://godoc.org/github.com/nats-io/nats.go#MsgHandler).
 
 ## Why NATS?
 

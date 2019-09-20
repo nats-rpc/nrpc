@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 	github_com_nats_rpc_nrpc "github.com/nats-rpc/nrpc"
 	"github.com/nats-rpc/nrpc"
 )

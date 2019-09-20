@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	nats "github.com/nats-io/go-nats"
+	"github.com/nats-io/nats.go"
 
 	// This is the package containing the generated *.pb.go and *.nrpc.go
 	// files.
