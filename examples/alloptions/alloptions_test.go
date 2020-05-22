@@ -11,7 +11,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-rpc/nrpc"
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestingLogWriter struct {
@@ -129,9 +129,9 @@ func TestAll(t *testing.T) {
 			t.Run(protocol, func(t *testing.T) {
 				c1.Encoding = protocol
 				if protocol == "protobuf" {
-					assert.Equal(t, "root.default.custom_subject.mtnorequest", c1.MtNoRequestSubject())
+					require.Equal(t, "root.default.custom_subject.mtnorequest", c1.MtNoRequestSubject())
 				} else {
-					assert.Equal(t, "root.default.custom_subject.mtnorequest."+protocol, c1.MtNoRequestSubject())
+					require.Equal(t, "root.default.custom_subject.mtnorequest."+protocol, c1.MtNoRequestSubject())
 				}
 				sub, err := c1.MtNoRequestSubscribeSync()
 				if err != nil {
@@ -149,7 +149,7 @@ func TestAll(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				assert.Equal(t, "test", msg.GetReply())
+				require.Equal(t, "test", msg.GetReply())
 			})
 		}
 	})
