@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"github.com/nats-io/nats.go"
 	github_com_nats_rpc_nrpc "github.com/nats-rpc/nrpc"
 	"github.com/nats-rpc/nrpc"

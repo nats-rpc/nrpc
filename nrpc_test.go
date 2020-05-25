@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/nats-io/nats.go"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/nats-rpc/nrpc"
 )
 
-//go:generate protoc --go_out=. nrpc_test.proto
+//go:generate protoc --go_out=. --go_opt=paths=source_relative nrpc_test.proto
 //go:generate mv nrpc_test.pb.go nrpcpb_test.go
 
 func TestBasic(t *testing.T) {

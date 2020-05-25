@@ -22,6 +22,8 @@ import "nrpc.proto";
 
 package helloworld;
 
+option go_package = "github.com/nats-rpc/nrpc/examples/helloworld/helloworld";
+
 // The greeting service definition.
 service Greeter {
   // Sends a greeting

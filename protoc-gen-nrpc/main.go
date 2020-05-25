@@ -12,10 +12,9 @@ import (
 
 	"github.com/nats-rpc/nrpc"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"github.com/golang/protobuf/protoc-gen-go/generator"
-	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
+	"google.golang.org/protobuf/proto"
+	descriptor "google.golang.org/protobuf/types/descriptorpb"
+	plugin "google.golang.org/protobuf/types/pluginpb"
 )
 
 // baseName returns the last path element of the name, with the last dotted suffix removed.
@@ -42,7 +41,7 @@ func getGoPackage(fd *descriptor.FileDescriptorProto) string {
 				"protoc-gen-nrpc: go_package '%s' contains more than 1 ';'",
 				pkg)
 		}
-		pkg = parts[0]
+		pkg = parts[1]
 	}
 
 	return pkg
@@ -100,6 +99,10 @@ func goFileName(d *descriptor.FileDescriptorProto) string {
 	}
 	name += ".nrpc.go"
 
+	if pathsSourceRelative {
+		return name
+	}
+
 	// Does the file have a "go_package" option?
 	// If it does, it may override the filename.
 	if impPath, _, ok := goPackageOption(d); ok && impPath != "" {
@@ -110,15 +113,6 @@ func goFileName(d *descriptor.FileDescriptorProto) string {
 	}
 
 	return name
-}
-
-func fieldGoType(td *descriptor.FieldDescriptorProto) string {
-	// Use protoc-gen-go generator to get the actual go type (for plain types
-	// only!)
-	t, _ := (*generator.Generator)(nil).GoType(nil, td)
-	// We assume proto3, but pass nil to the generator, which will assume proto2.
-	// The consequence is a leading star on the type that we need to trim
-	return strings.TrimPrefix(t, "*")
 }
 
 // splitMessageTypeName split a message type into (package name, type name)
@@ -219,10 +213,9 @@ func getOneofDecl(d *descriptor.DescriptorProto, name string) *descriptor.OneofD
 
 func pkgSubject(fd *descriptor.FileDescriptorProto) string {
 	if options := fd.GetOptions(); options != nil {
-		e, err := proto.GetExtension(options, nrpc.E_PackageSubject)
-		if err == nil {
-			value := e.(*string)
-			return *value
+		e := proto.GetExtension(options, nrpc.E_PackageSubject)
+		if value, ok := e.(string); ok {
+			return value
 		}
 	}
 	return fd.GetPackage()
@@ -253,6 +246,7 @@ func getPkgImportName(goPkg string) string {
 }
 
 var pluginPrometheus bool
+var pathsSourceRelative bool
 
 var funcMap = template.FuncMap{
 	"GoPackageName": func(fd *descriptor.FileDescriptorProto) string {
@@ -302,31 +296,26 @@ var funcMap = template.FuncMap{
 	"GetPkgSubject": pkgSubject,
 	"GetPkgSubjectParams": func(fd *descriptor.FileDescriptorProto) []string {
 		if opts := fd.GetOptions(); opts != nil {
-			e, err := proto.GetExtension(opts, nrpc.E_PackageSubjectParams)
-			if err == nil {
-				value := e.([]string)
-				return value
-			}
+			e := proto.GetExtension(opts, nrpc.E_PackageSubjectParams)
+			value := e.([]string)
+			return value
 		}
 		return nil
 	},
 	"GetServiceSubject": func(sd *descriptor.ServiceDescriptorProto) string {
 		if opts := sd.GetOptions(); opts != nil {
-			s, err := proto.GetExtension(opts, nrpc.E_ServiceSubject)
-			if err == nil {
-				value := s.(*string)
-				return *value
+			s := proto.GetExtension(opts, nrpc.E_ServiceSubject)
+			if value, ok := s.(string); ok && s != "" {
+				return value
 			}
 		}
 		if opts := currentFile.GetOptions(); opts != nil {
-			s, err := proto.GetExtension(opts, nrpc.E_ServiceSubjectRule)
-			if err == nil {
-				switch *(s.(*nrpc.SubjectRule)) {
-				case nrpc.SubjectRule_COPY:
-					return sd.GetName()
-				case nrpc.SubjectRule_TOLOWER:
-					return strings.ToLower(sd.GetName())
-				}
+			s := proto.GetExtension(opts, nrpc.E_ServiceSubjectRule)
+			switch s.(nrpc.SubjectRule) {
+			case nrpc.SubjectRule_COPY:
+				return sd.GetName()
+			case nrpc.SubjectRule_TOLOWER:
+				return strings.ToLower(sd.GetName())
 			}
 		}
 		return sd.GetName()
@@ -341,45 +330,45 @@ var funcMap = template.FuncMap{
 	},
 	"GetMethodSubject": func(md *descriptor.MethodDescriptorProto) string {
 		if opts := md.GetOptions(); opts != nil {
-			s, err := proto.GetExtension(opts, nrpc.E_MethodSubject)
-			if err == nil {
-				value := s.(*string)
-				return *value
+			s := proto.GetExtension(opts, nrpc.E_MethodSubject)
+			if value, ok := s.(string); ok && value != "" {
+				return value
 			}
 		}
 		if opts := currentFile.GetOptions(); opts != nil {
-			s, err := proto.GetExtension(opts, nrpc.E_MethodSubjectRule)
-			if err == nil {
-				switch *(s.(*nrpc.SubjectRule)) {
-				case nrpc.SubjectRule_COPY:
-					return md.GetName()
-				case nrpc.SubjectRule_TOLOWER:
-					return strings.ToLower(md.GetName())
-				}
+			s := proto.GetExtension(opts, nrpc.E_MethodSubjectRule)
+			switch s.(nrpc.SubjectRule) {
+			case nrpc.SubjectRule_COPY:
+				return md.GetName()
+			case nrpc.SubjectRule_TOLOWER:
+				return strings.ToLower(md.GetName())
 			}
 		}
 		return md.GetName()
 	},
 	"GetMethodSubjectParams": func(md *descriptor.MethodDescriptorProto) []string {
 		if opts := md.GetOptions(); opts != nil {
-			if e, err := proto.GetExtension(opts, nrpc.E_MethodSubjectParams); err == nil {
-				return e.([]string)
+			e := proto.GetExtension(opts, nrpc.E_MethodSubjectParams)
+			if s, ok := e.([]string); ok {
+				return s
 			}
 		}
 		return []string{}
 	},
 	"GetServiceSubjectParams": func(sd *descriptor.ServiceDescriptorProto) []string {
 		if opts := sd.GetOptions(); opts != nil {
-			if e, err := proto.GetExtension(opts, nrpc.E_ServiceSubjectParams); err == nil {
-				return e.([]string)
+			e := proto.GetExtension(opts, nrpc.E_ServiceSubjectParams)
+			if s, ok := e.([]string); ok {
+				return s
 			}
 		}
 		return []string{}
 	},
 	"HasStreamedReply": func(md *descriptor.MethodDescriptorProto) bool {
 		if opts := md.GetOptions(); opts != nil {
-			if e, err := proto.GetExtension(opts, nrpc.E_StreamedReply); err == nil {
-				return *(e.(*bool))
+			e := proto.GetExtension(opts, nrpc.E_StreamedReply)
+			if s, ok := e.(bool); ok {
+				return s
 			}
 		}
 		return false
@@ -420,7 +409,34 @@ func main() {
 		log.Fatal("error: no files to generate")
 	}
 
-	pluginPrometheus = request.GetParameter() == "plugins=prometheus"
+	for _, param := range strings.Split(request.GetParameter(), ",") {
+		var value string
+		if i := strings.Index(param, "="); i >= 0 {
+			value = param[i+1:]
+			param = param[0:i]
+		}
+		switch param {
+		case "":
+			// Ignore.
+		case "plugins":
+			for _, plugin := range strings.Split(value, ";") {
+				switch plugin {
+				case "prometheus":
+					pluginPrometheus = true
+				default:
+					log.Fatalf("invalid plugin: %s", plugin)
+				}
+			}
+		case "paths":
+			if value == "source_relative" {
+				pathsSourceRelative = true
+			} else if value == "import" {
+				pathsSourceRelative = false
+			} else {
+				log.Fatalf(`unknown path type %q: want "import" or "source_relative"`, value)
+			}
+		}
+	}
 
 	tmpl, err := template.New(".").Funcs(funcMap).Parse(tFile)
 	if err != nil {

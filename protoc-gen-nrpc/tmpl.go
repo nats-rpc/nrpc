@@ -13,7 +13,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"github.com/nats-io/nats.go"
 	{{- range  GetExtraImports .}}
 	{{.}}

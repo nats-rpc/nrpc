@@ -1,12 +1,15 @@
 language: go
 
 go:
-  - 1.11
+  - 1.13
 
-before_install:
-  - curl -sSL https://github.com/google/protobuf/releases/download/v3.4.0/protoc-3.4.0-linux-x86_64.zip -o protoc.zip
+before_script:
+  - curl -sSL https://github.com/google/protobuf/releases/download/v3.12.1/protoc-3.12.1-linux-x86_64.zip -o protoc.zip
   - sudo unzip -d /usr protoc.zip
   - sudo chmod a+x /usr/bin/protoc
-  - sudo mv /usr/include/google $GOPATH/src
   - sudo chmod a+rx -R $GOPATH/src/google
-  - go get -u github.com/golang/protobuf/protoc-gen-go
+  - go get google.golang.org/protobuf/cmd/protoc-gen-go
+  - go install google.golang.org/protobuf/cmd/protoc-gen-go
+
+script:
+  - go test ./...

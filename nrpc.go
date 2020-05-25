@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
 	"github.com/nats-io/nats.go"
+	jsonpb "google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 // ContextKey type for storing values into context.Context
@@ -23,7 +23,7 @@ type ContextKey int
 // ErrStreamInvalidMsgCount is when a stream reply gets a wrong number of messages
 var ErrStreamInvalidMsgCount = errors.New("Stream reply received an incorrect number of messages")
 
-//go:generate protoc --go_out=../../.. nrpc.proto
+//go:generate protoc --go_out=. --go_opt=paths=source_relative nrpc.proto
 
 type NatsConn interface {
 	Publish(subj string, data []byte) error
@@ -53,7 +53,7 @@ func Unmarshal(encoding string, data []byte, msg proto.Message) error {
 	case "protobuf":
 		return proto.Unmarshal(data, msg)
 	case "json":
-		return jsonpb.UnmarshalString(string(data), msg)
+		return jsonpb.Unmarshal(data, msg)
 	default:
 		return errors.New("Invalid encoding: " + encoding)
 	}
@@ -81,12 +81,12 @@ func UnmarshalResponse(encoding string, data []byte, msg proto.Message) error {
 				panic("invalid error message")
 			}
 			var nrpcErr Error
-			if err := jsonpb.UnmarshalString(string(errbuf), &nrpcErr); err != nil {
+			if err := jsonpb.Unmarshal(errbuf, &nrpcErr); err != nil {
 				return err
 			}
 			return &nrpcErr
 		}
-		return jsonpb.UnmarshalString(string(data), msg)
+		return jsonpb.Unmarshal(data, msg)
 	default:
 		return errors.New("Invalid encoding: " + encoding)
 	}
@@ -97,9 +97,7 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 	case "protobuf":
 		return proto.Marshal(msg)
 	case "json":
-		buf := bytes.NewBuffer(nil)
-		err := new(jsonpb.Marshaler).Marshal(buf, msg)
-		return buf.Bytes(), err
+		return jsonpb.Marshal(msg)
 	default:
 		return nil, errors.New("Invalid encoding: " + encoding)
 	}
@@ -108,22 +106,18 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 func MarshalErrorResponse(encoding string, repErr *Error) ([]byte, error) {
 	switch encoding {
 	case "protobuf":
-		var (
-			buf  = []byte{0}
-			pBuf = proto.NewBuffer(buf)
-		)
-		if err := pBuf.Marshal(repErr); err != nil {
+		b, err := proto.Marshal(repErr)
+		if err != nil {
 			return nil, err
 		}
-		return pBuf.Bytes(), nil
+		return append([]byte{0}, b...), nil
 	case "json":
-		buf := bytes.NewBuffer(nil)
-		err := new(jsonpb.Marshaler).Marshal(buf, repErr)
+		b, err := jsonpb.Marshal(repErr)
 		if err != nil {
 			return nil, err
 		}
 		return json.Marshal(map[string]json.RawMessage{
-			"__error__": json.RawMessage(buf.Bytes()),
+			"__error__": json.RawMessage(b),
 		})
 	default:
 		return nil, errors.New("Invalid encoding: " + encoding)

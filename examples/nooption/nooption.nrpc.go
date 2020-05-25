@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-rpc/nrpc"
 )
@@ -52,7 +52,7 @@ func (h *GreeterHandler) SetEncodings(encodings []string) {
 }
 
 func (h *GreeterHandler) Subject() string {
-	return "nooption.Greeter.>"
+	return "Greeter.>"
 }
 
 func (h *GreeterHandler) Handler(msg *nats.Msg) {
@@ -65,7 +65,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 	request := nrpc.NewRequest(ctx, h.nc, msg.Subject, msg.Reply)
 	// extract method name & encoding from subject
 	_, _, name, tail, err := nrpc.ParseSubject(
-		"nooption", 0, "Greeter", 0, msg.Subject)
+		"", 0, "Greeter", 0, msg.Subject)
 	if err != nil {
 		log.Printf("GreeterHanlder: Greeter subject parsing failed: %v", err)
 		return
@@ -128,7 +128,6 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 
 type GreeterClient struct {
 	nc      nrpc.NatsConn
-	PkgSubject string
 	Subject string
 	Encoding string
 	Timeout time.Duration
@@ -137,7 +136,6 @@ type GreeterClient struct {
 func NewGreeterClient(nc nrpc.NatsConn) *GreeterClient {
 	return &GreeterClient{
 		nc:      nc,
-		PkgSubject: "nooption",
 		Subject: "Greeter",
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
@@ -146,7 +144,7 @@ func NewGreeterClient(nc nrpc.NatsConn) *GreeterClient {
 
 func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
 
-	subject := c.PkgSubject + "." + c.Subject + "." + "SayHello"
+	subject := c.Subject + "." + "SayHello"
 
 	// call
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
@@ -161,7 +159,6 @@ type Client struct {
 	nc      nrpc.NatsConn
 	defaultEncoding string
 	defaultTimeout time.Duration
-	pkgSubject string
 	Greeter *GreeterClient
 }
 
@@ -170,7 +167,6 @@ func NewClient(nc nrpc.NatsConn) *Client {
 		nc: nc,
 		defaultEncoding: "protobuf",
 		defaultTimeout: 5*time.Second,
-		pkgSubject: "nooption",
 	}
 	c.Greeter = NewGreeterClient(nc)
 	return &c
