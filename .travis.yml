@@ -5,9 +5,9 @@ go:
 
 before_script:
   - curl -sSL https://github.com/google/protobuf/releases/download/v3.12.1/protoc-3.12.1-linux-x86_64.zip -o protoc.zip
-  - sudo unzip -d /usr protoc.zip
-  - sudo chmod a+x /usr/bin/protoc
-  - sudo chmod a+rx -R $GOPATH/src/google
+  - sudo unzip -d /usr/local protoc.zip
+  - sudo chmod a+x /usr/local/bin/protoc
+  - sudo chmod -R a+rx /usr/local/include/google
   - go get google.golang.org/protobuf/cmd/protoc-gen-go
   - go install google.golang.org/protobuf/cmd/protoc-gen-go
 
