@@ -23,6 +23,9 @@ type ContextKey int
 // ErrStreamInvalidMsgCount is when a stream reply gets a wrong number of messages
 var ErrStreamInvalidMsgCount = errors.New("Stream reply received an incorrect number of messages")
 
+// Set the UseProtoNames flag in protojson MarshalOptions
+var UseProtoNames = false
+
 //go:generate protoc --go_out=. --go_opt=paths=source_relative nrpc.proto
 
 type NatsConn interface {
@@ -97,7 +100,7 @@ func Marshal(encoding string, msg proto.Message) ([]byte, error) {
 	case "protobuf":
 		return proto.Marshal(msg)
 	case "json":
-		return jsonpb.Marshal(msg)
+		return jsonpb.MarshalOptions{UseProtoNames: UseProtoNames}.Marshal(msg)
 	default:
 		return nil, errors.New("Invalid encoding: " + encoding)
 	}

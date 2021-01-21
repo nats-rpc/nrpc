@@ -24,6 +24,10 @@ import (
 	"github.com/nats-rpc/nrpc"
 )
 
+{{- if UseProtoNames}}
+nrcp.UseProtoNames = true
+{{- end }}
+
 {{- range .Service}}
 
 // {{.GetName}}Server is the interface that providers of the service
