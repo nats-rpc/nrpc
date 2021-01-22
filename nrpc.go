@@ -244,6 +244,66 @@ func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, enc
 	return nil
 }
 
+func Poll(
+	req proto.Message, rep proto.Message,
+	nc NatsConn, subject string, encoding string, timeout time.Duration,
+	maxreplies int, cb func() error,
+) error {
+	// encode request
+	rawRequest, err := Marshal(encoding, req)
+	if err != nil {
+		log.Printf("nrpc: inner request marshal failed: %v", err)
+		return err
+	}
+
+	if encoding != "protobuf" {
+		subject += "." + encoding
+	}
+
+	reply := GetReplyInbox(nc)
+	replyC := make(chan *nats.Msg)
+	defer close(replyC)
+
+	sub, err := nc.ChanSubscribe(reply, replyC)
+	defer func() {
+		if err := sub.Unsubscribe(); err != nil {
+			log.Printf("nrpc: nats unsubscribe failed: %v", err)
+		}
+	}()
+
+	if err := nc.PublishRequest(subject, reply, rawRequest); err != nil {
+		log.Printf("nrpc: nats request failed: %v", err)
+		return err
+	}
+
+	timeoutC := time.After(timeout)
+	var replyCount int
+
+	for {
+		select {
+		case msg := <-replyC:
+			replyCount++
+
+			data := msg.Data
+
+			if err := UnmarshalResponse(encoding, data, rep); err != nil {
+				if _, isError := err.(*Error); !isError {
+					log.Printf("nrpc: response unmarshal failed: %v", err)
+				}
+				return err
+			}
+			if err := cb(); err != nil {
+				return err
+			}
+			if replyCount == maxreplies {
+				return nil
+			}
+		case <-timeoutC:
+			return nats.ErrTimeout
+		}
+	}
+}
+
 const (
 	// RequestContextKey is the key for string the request into the context
 	RequestContextKey ContextKey = iota
