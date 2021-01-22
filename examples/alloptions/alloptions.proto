@@ -17,6 +17,7 @@ service SvcCustomSubject {
 
     rpc MtSimpleReply(StringArg) returns (SimpleStringReply) {
         option (nrpc.methodSubject) = "mt_simple_reply";
+        option (nrpc.pollingEnabled) = true;
     }
     rpc MtVoidReply(StringArg) returns (nrpc.Void) {}
     rpc MtNoRequest(nrpc.NoRequest) returns (SimpleStringReply) {}

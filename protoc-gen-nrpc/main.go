@@ -373,6 +373,15 @@ var funcMap = template.FuncMap{
 		}
 		return false
 	},
+	"HasPollEnabled": func(md *descriptor.MethodDescriptorProto) bool {
+		if opts := md.GetOptions(); opts != nil {
+			e := proto.GetExtension(opts, nrpc.E_PollingEnabled)
+			if s, ok := e.(bool); ok {
+				return s
+			}
+		}
+		return false
+	},
 	"Prometheus": func() bool {
 		return pluginPrometheus
 	},

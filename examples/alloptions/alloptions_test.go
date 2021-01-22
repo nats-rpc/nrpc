@@ -338,6 +338,17 @@ func commonTests(
 			t.Error("Invalid reply:", r.GetReply())
 		}
 
+		if err := c1.MtSimpleReplyPoll(StringArg{Arg1: "hi"}, 1,
+			func(r SimpleStringReply) error {
+				if r.GetReply() != "hi" {
+					return fmt.Errorf("Invalid reply: %s", r.GetReply())
+				}
+				return nil
+			},
+		); err != nil {
+			t.Fatal(err)
+		}
+
 		if err := c1.MtVoidReply(StringArg{Arg1: "hi"}); err != nil {
 			t.Error("Unexpected error:", err)
 		}

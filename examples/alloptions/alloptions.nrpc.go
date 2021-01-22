@@ -252,6 +252,25 @@ func (c *SvcCustomSubjectClient) MtSimpleReply(req StringArg) (resp SimpleString
 	return
 }
 
+func (c *SvcCustomSubjectClient) MtSimpleReplyPoll(req StringArg,maxreplies int, cb func (SimpleStringReply) error,
+) (error) {
+
+	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mt_simple_reply"
+
+	var resp SimpleStringReply
+
+	err := nrpc.Poll(&req, &resp, c.nc, subject, c.Encoding, c.Timeout, maxreplies, 
+		func() error {
+			return cb(resp)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *SvcCustomSubjectClient) MtVoidReply(req StringArg) (err error) {
 
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreply"

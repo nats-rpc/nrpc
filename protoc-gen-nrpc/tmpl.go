@@ -579,6 +579,62 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 
 	return
 }
+
+{{- if HasPollEnabled .}}
+
+func (c *{{$serviceName}}Client) {{.GetName}}Poll(
+	{{- range GetMethodSubjectParams . -}}
+	{{ . }} string, {{ end -}}
+	{{- if ne .GetInputType ".nrpc.Void" -}}
+	req {{GoType .GetInputType}},
+	{{- end -}}
+	maxreplies int, cb func ({{GoType .GetOutputType}}) error,
+) (error) {
+{{- if Prometheus}}
+	start := time.Now()
+{{- end}}
+
+	subject := {{ if ne 0 (len $pkgSubject) -}}
+		c.PkgSubject + "." + {{end}}
+	{{- range $pkgSubjectParams -}}
+		c.PkgParam{{.}} + "." + {{end -}}
+	c.Subject + "." + {{range $serviceSubjectParams -}}
+		c.SvcParam{{.}} + "." + {{end -}}
+	"{{GetMethodSubject .}}"
+	{{- range GetMethodSubjectParams . }} + "." + {{ . }}{{ end }}
+
+	{{- if eq .GetInputType ".nrpc.Void"}}
+	var req {{GoType .GetInputType}}
+	{{- end}}
+
+	var resp {{GoType .GetOutputType}}
+
+	err := nrpc.Poll(&req, &resp, c.nc, subject, c.Encoding, c.Timeout, maxreplies, 
+		func() error {
+			return cb(resp)
+		},
+	)
+	if err != nil {
+{{- if Prometheus}}
+		clientCallsFor{{$serviceName}}.WithLabelValues(
+			"{{.GetName}}", c.Encoding, "poll_fail").Inc()
+{{- end}}
+		return err
+	}
+
+{{- if Prometheus}}
+
+	// report total time taken to Prometheus
+	elapsed := time.Since(start).Seconds()
+	clientRCTFor{{$serviceName}}.WithLabelValues("{{.GetName}}").Observe(elapsed)
+	clientCallsFor{{$serviceName}}.WithLabelValues(
+		"{{.GetName}}", c.Encoding, "poll_success").Inc()
+{{- end}}
+
+	return nil
+}
+{{- end}}
+
 {{- end}}
 {{- end}}
 {{- end}}
