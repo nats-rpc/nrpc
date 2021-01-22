@@ -95,18 +95,18 @@ func UnmarshalResponse(encoding string, data []byte, msg proto.Message) error {
 	}
 }
 
-func Marshal(encoding string, msg proto.Message) ([]byte, error) {
+func Marshal(encoding string, msg proto.Message, jsonMarshalOptions jsonpb.MarshalOptions) ([]byte, error) {
 	switch encoding {
 	case "protobuf":
 		return proto.Marshal(msg)
 	case "json":
-		return jsonpb.MarshalOptions{UseProtoNames: UseProtoNames}.Marshal(msg)
+		return jsonMarshalOptions.Marshal(msg)
 	default:
 		return nil, errors.New("Invalid encoding: " + encoding)
 	}
 }
 
-func MarshalErrorResponse(encoding string, repErr *Error) ([]byte, error) {
+func MarshalErrorResponse(encoding string, repErr *Error, jsonMarshalOptions jsonpb.MarshalOptions) ([]byte, error) {
 	switch encoding {
 	case "protobuf":
 		b, err := proto.Marshal(repErr)
@@ -209,9 +209,9 @@ func ParseSubjectTail(
 	return
 }
 
-func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, encoding string, timeout time.Duration) error {
+func Call(req proto.Message, rep proto.Message, nc NatsConn, subject string, encoding string, timeout time.Duration, options jsonpb.MarshalOptions) error {
 	// encode request
-	rawRequest, err := Marshal(encoding, req)
+	rawRequest, err := Marshal(encoding, req, options)
 	if err != nil {
 		log.Printf("nrpc: inner request marshal failed: %v", err)
 		return err
@@ -255,11 +255,12 @@ const (
 // NewRequest creates a Request instance
 func NewRequest(ctx context.Context, conn NatsConn, subject string, replySubject string) *Request {
 	return &Request{
-		Context:      ctx,
-		Conn:         conn,
-		Subject:      subject,
-		ReplySubject: replySubject,
-		CreatedAt:    time.Now(),
+		Context:            ctx,
+		Conn:               conn,
+		Subject:            subject,
+		ReplySubject:       replySubject,
+		CreatedAt:          time.Now(),
+		JSONMarshalOptions: jsonpb.MarshalOptions{},
 	}
 }
 
@@ -288,9 +289,10 @@ type Request struct {
 	CreatedAt time.Time
 	StartedAt time.Time
 
-	Encoding     string
-	NoReply      bool
-	ReplySubject string
+	Encoding           string
+	NoReply            bool
+	ReplySubject       string
+	JSONMarshalOptions jsonpb.MarshalOptions
 
 	PackageParams map[string]string
 	ServiceParams map[string]string
@@ -423,7 +425,7 @@ func (r *Request) SendReply(resp proto.Message, withError *Error) error {
 
 // sendReply sends a reply to the caller
 func (r *Request) sendReply(resp proto.Message, withError *Error) error {
-	return Publish(resp, withError, r.Conn, r.ReplySubject, r.Encoding)
+	return Publish(resp, withError, r.Conn, r.ReplySubject, r.Encoding, r.JSONMarshalOptions)
 }
 
 // SendErrorTooBusy cancels the request with a 'SERVERTOOBUSY' error
@@ -463,18 +465,19 @@ func NewStreamCallSubscription(
 }
 
 type StreamCallSubscription struct {
-	ctx      context.Context
-	nc       NatsConn
-	encoding string
-	subject  string
-	timeout  time.Duration
-	timeoutT *time.Timer
-	closed   bool
-	subCh    chan *nats.Msg
-	nextCh   chan *nats.Msg
-	quit     chan struct{}
-	errCh    chan error
-	msgCount uint32
+	ctx                context.Context
+	nc                 NatsConn
+	encoding           string
+	subject            string
+	timeout            time.Duration
+	timeoutT           *time.Timer
+	closed             bool
+	subCh              chan *nats.Msg
+	nextCh             chan *nats.Msg
+	quit               chan struct{}
+	errCh              chan error
+	JSONMarshalOptions jsonpb.MarshalOptions
+	msgCount           uint32
 }
 
 func (sub *StreamCallSubscription) stop() {
@@ -501,7 +504,7 @@ func (sub *StreamCallSubscription) loop(ssub *nats.Subscription) {
 			return
 		case <-sub.ctx.Done():
 			// send a 'lastbeat' and quit
-			b, err := Marshal(sub.encoding, &HeartBeat{Lastbeat: true})
+			b, err := Marshal(sub.encoding, &HeartBeat{Lastbeat: true}, sub.JSONMarshalOptions)
 			if err != nil {
 				err = fmt.Errorf("Error marshaling heartbeat: %s", err)
 				sub.errCh <- err
@@ -515,7 +518,7 @@ func (sub *StreamCallSubscription) loop(ssub *nats.Subscription) {
 			sub.errCh <- ErrCanceled
 			return
 		case <-ticker.C:
-			msg, err := Marshal(sub.encoding, &HeartBeat{})
+			msg, err := Marshal(sub.encoding, &HeartBeat{}, sub.JSONMarshalOptions)
 			if err != nil {
 				err = fmt.Errorf("Error marshaling heartbeat: %s", err)
 				sub.errCh <- err
@@ -567,8 +570,8 @@ func (sub *StreamCallSubscription) Next(rep proto.Message) error {
 	return nil
 }
 
-func StreamCall(ctx context.Context, nc NatsConn, subject string, req proto.Message, encoding string, timeout time.Duration) (*StreamCallSubscription, error) {
-	rawRequest, err := Marshal(encoding, req)
+func StreamCall(ctx context.Context, nc NatsConn, subject string, req proto.Message, encoding string, timeout time.Duration, jsonMarshalOptions jsonpb.MarshalOptions) (*StreamCallSubscription, error) {
+	rawRequest, err := Marshal(encoding, req, jsonMarshalOptions)
 	if err != nil {
 		log.Printf("nrpc: inner request marshal failed: %v", err)
 		return nil, err
@@ -592,14 +595,14 @@ func StreamCall(ctx context.Context, nc NatsConn, subject string, req proto.Mess
 	return streamSub, nil
 }
 
-func Publish(resp proto.Message, withError *Error, nc NatsConn, subject string, encoding string) error {
+func Publish(resp proto.Message, withError *Error, nc NatsConn, subject string, encoding string, jsonMarshalOptions jsonpb.MarshalOptions) error {
 	var rawResponse []byte
 	var err error
 
 	if withError != nil {
-		rawResponse, err = MarshalErrorResponse(encoding, withError)
+		rawResponse, err = MarshalErrorResponse(encoding, withError, jsonMarshalOptions)
 	} else {
-		rawResponse, err = Marshal(encoding, resp)
+		rawResponse, err = Marshal(encoding, resp, jsonMarshalOptions)
 	}
 
 	if err != nil {

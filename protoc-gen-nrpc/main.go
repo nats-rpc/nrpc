@@ -247,7 +247,6 @@ func getPkgImportName(goPkg string) string {
 
 var pluginPrometheus bool
 var pathsSourceRelative bool
-var useProtoNames bool
 
 var funcMap = template.FuncMap{
 	"GoPackageName": func(fd *descriptor.FileDescriptorProto) string {
@@ -321,6 +320,15 @@ var funcMap = template.FuncMap{
 		}
 		return sd.GetName()
 	},
+	"ServiceJSONUseProtoNames": func(sd *descriptor.ServiceDescriptorProto) bool {
+		if opts := sd.GetOptions(); opts != nil {
+			s := proto.GetExtension(opts, nrpc.E_ServiceJSONUseProtoNames)
+			if value, ok := s.(bool); ok {
+				return value
+			}
+		}
+		return false
+	},
 	"ServiceNeedsHandler": func(sd *descriptor.ServiceDescriptorProto) bool {
 		for _, md := range sd.GetMethod() {
 			if md.GetInputType() != ".nrpc.NoRequest" {
@@ -377,9 +385,6 @@ var funcMap = template.FuncMap{
 	"Prometheus": func() bool {
 		return pluginPrometheus
 	},
-	"UseProtoNames": func() bool {
-		return useProtoNames
-	},
 	"GetResultType": getResultType,
 	"GoType": func(pbType string) string {
 		goPkg, goType := getGoType(pbType)
@@ -430,10 +435,6 @@ func main() {
 				default:
 					log.Fatalf("invalid plugin: %s", plugin)
 				}
-			}
-		case "use_proto_names":
-			if value == "true" {
-				useProtoNames = true
 			}
 		case "paths":
 			if value == "source_relative" {

@@ -13,6 +13,7 @@ import (
 	"log"
 	"time"
 
+	jsonpb "google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"github.com/nats-io/nats.go"
 	{{- range  GetExtraImports .}}
@@ -23,10 +24,6 @@ import (
 	{{- end}}
 	"github.com/nats-rpc/nrpc"
 )
-
-{{- if UseProtoNames}}
-nrcp.UseProtoNames = true
-{{- end }}
 
 {{- range .Service}}
 
@@ -114,26 +111,36 @@ type {{.GetName}}Handler struct {
 	workers *nrpc.WorkerPool
 	nc      nrpc.NatsConn
 	server  {{.GetName}}Server
+	jsonMarshalOptions jsonpb.MarshalOptions
 
 	encodings []string
 }
 
 func New{{.GetName}}Handler(ctx context.Context, nc nrpc.NatsConn, s {{.GetName}}Server) *{{.GetName}}Handler {
-	return &{{.GetName}}Handler{
+	h := &{{.GetName}}Handler{
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
-
+		jsonMarshalOptions: jsonpb.MarshalOptions{},
 		encodings: []string{"protobuf"},
 	}
+    {{- if ServiceJSONUseProtoNames .}}
+	h.jsonMarshalOptions.UseProtoNames = true
+    {{- end }}
+	return h
 }
 
 func New{{.GetName}}ConcurrentHandler(workers *nrpc.WorkerPool, nc nrpc.NatsConn, s {{.GetName}}Server) *{{.GetName}}Handler {
-	return &{{.GetName}}Handler{
+	h := &{{.GetName}}Handler{
 		workers: workers,
 		nc:      nc,
 		server:  s,
+		jsonMarshalOptions: jsonpb.MarshalOptions{},
 	}
+    {{- if ServiceJSONUseProtoNames .}}
+	h.jsonMarshalOptions.UseProtoNames = true
+    {{- end }}
+	return h
 }
 
 // SetEncodings sets the output encodings when using a '*Publish' function
@@ -164,7 +171,7 @@ func (h *{{$serviceName}}Handler) {{.GetName}}Publish(
 	{{- range GetMethodSubjectParams .}}mt{{.}} string, {{end -}}
 	msg {{GoType .GetOutputType}}) error {
 	for _, encoding := range h.encodings {
-		rawMsg, err := nrpc.Marshal(encoding, &msg)
+		rawMsg, err := nrpc.Marshal(encoding, &msg,h.jsonMarshalOptions)
 		if err != nil {
 			log.Printf("{{$serviceName}}Handler.{{.GetName}}Publish: error marshaling the message: %s", err)
 			return err
@@ -206,6 +213,9 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		log.Printf("{{.GetName}}Hanlder: {{.GetName}} subject parsing failed: %v", err)
 		return
 	}
+    {{- if ServiceJSONUseProtoNames .}}
+	request.JSONMarshalOptions.UseProtoNames = true
+    {{- end }}
 
 	request.MethodName = name
 	request.SubjectTail = tail
@@ -364,6 +374,7 @@ type {{.GetName}}Client struct {
 	{{- end}}
 	Encoding string
 	Timeout time.Duration
+	jsonMarshalOptions jsonpb.MarshalOptions
 }
 
 func New{{.GetName}}Client(nc nrpc.NatsConn
@@ -374,7 +385,7 @@ func New{{.GetName}}Client(nc nrpc.NatsConn
 	, svcParam{{ . }} string
 	{{- end -}}
 	) *{{.GetName}}Client {
-	return &{{.GetName}}Client{
+	client := &{{.GetName}}Client{
 		nc:      nc,
 		{{- if ne 0 (len $pkgSubject)}}
 		PkgSubject: "{{$pkgSubject}}",
@@ -388,7 +399,14 @@ func New{{.GetName}}Client(nc nrpc.NatsConn
 		{{- end}}
 		Encoding: "protobuf",
 		Timeout: 5 * time.Second,
+		jsonMarshalOptions: jsonpb.MarshalOptions{},
 	}
+
+	{{- if ServiceJSONUseProtoNames .}}
+	client.jsonMarshalOptions.UseProtoNames = true
+    {{- end }}
+
+	return client
 }
 {{- $serviceName := .GetName}}
 {{- $serviceSubjectParams := GetServiceSubjectParams .}}
@@ -503,7 +521,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 		{{- else -}}
 		, &nrpc.Void{}
 		{{- end -}}
-		, c.Encoding, c.Timeout)
+		, c.Encoding, c.Timeout, c.jsonMarshalOptions)
 	if err != nil {
 		{{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(
@@ -563,7 +581,9 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	{{- if eq .GetOutputType ".nrpc.Void" ".nrpc.NoReply"}}
 	var resp {{GoType .GetOutputType}}
 	{{- end}}
-	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
+	
+	
+	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout, c.jsonMarshalOptions)
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(

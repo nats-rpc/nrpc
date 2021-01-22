@@ -27,6 +27,8 @@ extend google.protobuf.ServiceOptions {
 	string serviceSubject = 51000;
 	// Parameters included in the subject at the service level
 	repeated string serviceSubjectParams = 51001;
+	// If true and encoding is set to json, fields will be encoded using the proto snake_case names instead of the default lowerCamelCase
+	bool serviceJSONUseProtoNames = 51002;
 }
 
 extend google.protobuf.MethodOptions {

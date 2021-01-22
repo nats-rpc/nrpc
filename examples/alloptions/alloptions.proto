@@ -13,6 +13,7 @@ option (nrpc.serviceSubjectRule) = TOLOWER;
 option (nrpc.methodSubjectRule) = TOLOWER;
 
 service SvcCustomSubject {
+    option (nrpc.serviceJSONUseProtoNames) = true;
     option (nrpc.serviceSubject) = 'custom_subject';
 
     rpc MtSimpleReply(StringArg) returns (SimpleStringReply) {
@@ -30,6 +31,7 @@ service SvcCustomSubject {
 }
 
 service SvcSubjectParams {
+    option (nrpc.serviceJSONUseProtoNames) = true;
     option (nrpc.serviceSubjectParams) = "clientid";
 
     rpc MtWithSubjectParams(nrpc.Void) returns (SimpleStringReply) {
