@@ -36,6 +36,8 @@ extend google.protobuf.MethodOptions {
     repeated string methodSubjectParams = 52001;
     // If true, the method returns a stream of reply messages instead of just one
     bool streamedReply = 52002;
+    // If true, a 'Polling' version of the client method is generated
+    bool pollingEnabled = 52003;
 }
 
 message Error {
