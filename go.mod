@@ -1,4 +1,4 @@
-module github.com/nats-rpc/nrpc
+module github.com/T-J-L/nrpc
 
 go 1.17
 

@@ -22,7 +22,7 @@ import "nrpc.proto";
 
 package helloworld;
 
-option go_package = "github.com/nats-rpc/nrpc/examples/helloworld/helloworld";
+option go_package = "github.com/T-J-L/nrpc/examples/helloworld/helloworld";
 
 // The greeting service definition.
 service Greeter {

@@ -20,7 +20,7 @@ option java_outer_classname = "HelloWorldProto";
 
 package helloworld;
 
-option go_package = "github.com/nats-rpc/nrpc/examples/metrics_helloworld/helloworld";
+option go_package = "github.com/T-J-L/nrpc/examples/metrics_helloworld/helloworld";
 
 // The greeting service definition.
 service Greeter {
