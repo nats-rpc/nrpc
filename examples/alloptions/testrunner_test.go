@@ -6,14 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/gnatsd/logger"
-	natsServer "github.com/nats-io/gnatsd/server"
+	"github.com/nats-io/nats-server/v2/logger"
+	"github.com/nats-io/nats-server/v2/server"
 )
 
 var natsURL string
 
 func TestMain(m *testing.M) {
-	gnatsd := natsServer.New(&natsServer.Options{Port: natsServer.RANDOM_PORT})
+	gnatsd, err := server.NewServer(&server.Options{Port: server.RANDOM_PORT})
+	if err != nil {
+		os.Exit(1)
+	}
 	gnatsd.SetLogger(
 		logger.NewStdLogger(false, false, false, false, false),
 		false, false)
@@ -21,7 +24,7 @@ func TestMain(m *testing.M) {
 	defer gnatsd.Shutdown()
 
 	if !gnatsd.ReadyForConnections(time.Second) {
-		log.Fatal("Cannot start the gnatsd server")
+		log.Fatal("Cannot start the nats server")
 	}
 	natsURL = "nats://" + gnatsd.Addr().String()
 

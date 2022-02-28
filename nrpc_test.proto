@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/nats-rpc/nrpc_test";
+option go_package = "github.com/T-J-L/nrpc_test";
 
 message DummyMessage {
     string foobar = 1;

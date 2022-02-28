@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package nooption;
 
-option go_package = "github.com/nats-rpc/nrpc/examples/nooption";
+option go_package = "github.com/T-J-L/nrpc/examples/nooption";
 
 service Greeter {
   // Sends a greeting

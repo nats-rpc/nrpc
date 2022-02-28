@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package nrpc;
 
-option go_package = "github.com/nats-rpc/nrpc";
+option go_package = "github.com/T-J-L/nrpc";
 
 import "google/protobuf/descriptor.proto";
 

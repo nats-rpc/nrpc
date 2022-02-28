@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/T-J-L/nrpc"
 	"github.com/nats-io/nats.go"
-	"github.com/nats-rpc/nrpc"
 	"github.com/stretchr/testify/require"
 )
 

@@ -21,7 +21,7 @@ import (
 	{{- if Prometheus}}
 	"github.com/prometheus/client_golang/prometheus"
 	{{- end}}
-	"github.com/nats-rpc/nrpc"
+	"github.com/T-J-L/nrpc"
 )
 
 {{- range .Service}}
