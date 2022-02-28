@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	natsserver "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 
 	// This is the package containing the generated *.pb.go and *.nrpc.go
@@ -13,18 +14,20 @@ import (
 )
 
 func TestBasic(t *testing.T) {
+	s := natsserver.RunRandClientPortServer()
+	defer s.Shutdown()
 	// Connect to the NATS server.
-	nc, err := nats.Connect(natsURL, nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(s.ClientURL(), nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer nc.Close()
 
 	// Our server implementation.
-	s := &server{}
+	srv := &server{}
 
 	// The NATS handler from the helloworld.nrpc.proto file.
-	h := helloworld.NewGreeterHandler(context.TODO(), nc, s)
+	h := helloworld.NewGreeterHandler(context.TODO(), nc, srv)
 
 	// Start a NATS subscription using the handler. You can also use the
 	// QueueSubscribe() method for a load-balanced set of servers.

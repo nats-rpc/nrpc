@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/T-J-L/nrpc"
-	github_com_nats_rpc_nrpc "github.com/T-J-L/nrpc"
+	github_com_T_J_L_nrpc "github.com/T-J-L/nrpc"
 )
 
 // SvcCustomSubjectServer is the interface that providers of the service
@@ -177,7 +177,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtVoidReqStreamedReplyHanlder: MtVoidReqStreamedReply subject parsing failed: %v", err)
 			break
 		}
-		var req github_com_nats_rpc_nrpc.Void
+		var req github_com_T_J_L_nrpc.Void
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("MtVoidReqStreamedReplyHandler: MtVoidReqStreamedReply request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -258,7 +258,7 @@ func (c *SvcCustomSubjectClient) MtVoidReply(req StringArg) (err error) {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreply"
 
 	// call
-	var resp github_com_nats_rpc_nrpc.Void
+	var resp github_com_T_J_L_nrpc.Void
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
@@ -471,7 +471,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtWithSubjectParamsHanlder: MtWithSubjectParams subject parsing failed: %v", err)
 			break
 		}
-		var req github_com_nats_rpc_nrpc.Void
+		var req github_com_T_J_L_nrpc.Void
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("MtWithSubjectParamsHandler: MtWithSubjectParams request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -494,7 +494,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtStreamedReplyWithSubjectParamsHanlder: MtStreamedReplyWithSubjectParams subject parsing failed: %v", err)
 			break
 		}
-		var req github_com_nats_rpc_nrpc.Void
+		var req github_com_T_J_L_nrpc.Void
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("MtStreamedReplyWithSubjectParamsHandler: MtStreamedReplyWithSubjectParams request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -517,7 +517,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtNoReplyHanlder: MtNoReply subject parsing failed: %v", err)
 			break
 		}
-		var req github_com_nats_rpc_nrpc.Void
+		var req github_com_T_J_L_nrpc.Void
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
 			log.Printf("MtNoReplyHandler: MtNoReply request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -591,7 +591,7 @@ func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string) (re
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtwithsubjectparams" + "." + mp1 + "." + mp2
 
 	// call
-	var req github_com_nats_rpc_nrpc.Void
+	var req github_com_T_J_L_nrpc.Void
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
@@ -630,8 +630,8 @@ func (c *SvcSubjectParamsClient) MtNoReply() (err error) {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtnoreply"
 
 	// call
-	var req github_com_nats_rpc_nrpc.Void
-	var resp github_com_nats_rpc_nrpc.NoReply
+	var req github_com_T_J_L_nrpc.Void
+	var resp github_com_T_J_L_nrpc.NoReply
 	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged

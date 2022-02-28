@@ -6,9 +6,14 @@ import (
 	"os/exec"
 	"testing"
 	"time"
+
+	natsserver "github.com/nats-io/nats-server/v2/test"
 )
 
 func TestHelloWorldExample(t *testing.T) {
+	s := natsserver.RunRandClientPortServer()
+	defer s.Shutdown()
+
 	// make sure protoc-gen-nrpc is up to date
 	installGenRPC := exec.Command("go", "install", "./protoc-gen-nrpc")
 	if out, err := installGenRPC.CombinedOutput(); err != nil {
@@ -33,7 +38,7 @@ func TestHelloWorldExample(t *testing.T) {
 		t.Fatal("Buid client failed", err, string(out))
 	}
 	// run the server
-	server := exec.Command("./examples/helloworld/greeter_server/greeter_server", NatsURL)
+	server := exec.Command("./examples/helloworld/greeter_server/greeter_server", s.ClientURL())
 	var serverStdout bytes.Buffer
 	server.Stdout = &serverStdout
 	server.Start()
@@ -51,7 +56,7 @@ func TestHelloWorldExample(t *testing.T) {
 	time.Sleep(250 * time.Millisecond)
 
 	// run the client and check its output
-	client := exec.Command("./examples/helloworld/greeter_client/greeter_client", NatsURL)
+	client := exec.Command("./examples/helloworld/greeter_client/greeter_client", s.ClientURL())
 	timeout := time.AfterFunc(time.Second, func() { client.Process.Kill() })
 	out, err := client.CombinedOutput()
 	timeout.Stop()

@@ -9,9 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/T-J-L/nrpc"
+	natsserver "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/require"
+
+	"github.com/T-J-L/nrpc"
 )
 
 type TestingLogWriter struct {
@@ -111,7 +113,10 @@ func (s BasicServerImpl) MtStreamedReplyWithSubjectParams(
 }
 
 func TestAll(t *testing.T) {
-	c, err := nats.Connect(natsURL)
+	s := natsserver.RunRandClientPortServer()
+	defer s.Shutdown()
+
+	c, err := nats.Connect(s.ClientURL())
 	if err != nil {
 		t.Fatal(err)
 	}

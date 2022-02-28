@@ -117,7 +117,7 @@ func MarshalErrorResponse(encoding string, repErr *Error) ([]byte, error) {
 			return nil, err
 		}
 		return json.Marshal(map[string]json.RawMessage{
-			"__error__": json.RawMessage(b),
+			"__error__": b,
 		})
 	default:
 		return nil, errors.New("Invalid encoding: " + encoding)

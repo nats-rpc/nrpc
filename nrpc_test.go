@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	natsserver "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
 
@@ -19,7 +20,10 @@ import (
 //go:generate mv nrpc_test.pb.go nrpcpb_test.go
 
 func TestBasic(t *testing.T) {
-	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
+	s := natsserver.RunRandClientPortServer()
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL(), nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +51,10 @@ func TestBasic(t *testing.T) {
 }
 
 func TestDecode(t *testing.T) {
-	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
+	s := natsserver.RunRandClientPortServer()
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL(), nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +95,10 @@ func TestDecode(t *testing.T) {
 }
 
 func TestStreamCall(t *testing.T) {
-	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
+	s := natsserver.RunRandClientPortServer()
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL(), nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +217,10 @@ func TestStreamCall(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
-	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
+	s := natsserver.RunRandClientPortServer()
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL(), nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +250,10 @@ func TestError(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	nc, err := nats.Connect(nrpc.NatsURL, nats.Timeout(5*time.Second))
+	s := natsserver.RunRandClientPortServer()
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL(), nats.Timeout(5*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
