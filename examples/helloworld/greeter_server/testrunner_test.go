@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nats-io/gnatsd/logger"
-	natsServer "github.com/nats-io/gnatsd/server"
+	"github.com/nats-io/nats-server/v2/logger"
+	natsServer "github.com/nats-io/nats-server/v2/server"
 )
 
 var natsURL string
