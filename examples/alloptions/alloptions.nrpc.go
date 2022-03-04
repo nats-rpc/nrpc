@@ -324,7 +324,7 @@ func (c *SvcCustomSubjectClient) MtNoRequestSubscribeChan() (<-chan SimpleString
 func (c *SvcCustomSubjectClient) MtStreamedReply(
 	ctx context.Context,
 	req StringArg,
-	cb func(context.Context, SimpleStringReply),
+	cb func(context.Context, *SimpleStringReply),
 ) error {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtstreamedreply"
 
@@ -333,9 +333,9 @@ func (c *SvcCustomSubjectClient) MtStreamedReply(
 		return err
 	}
 
-	var res SimpleStringReply
+	var res *SimpleStringReply
 	for {
-		err = sub.Next(&res)
+		err = sub.Next(res)
 		if err != nil {
 			break
 		}
@@ -349,7 +349,7 @@ func (c *SvcCustomSubjectClient) MtStreamedReply(
 
 func (c *SvcCustomSubjectClient) MtVoidReqStreamedReply(
 	ctx context.Context,
-	cb func(context.Context, SimpleStringReply),
+	cb func(context.Context, *SimpleStringReply),
 ) error {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreqstreamedreply"
 
@@ -358,9 +358,9 @@ func (c *SvcCustomSubjectClient) MtVoidReqStreamedReply(
 		return err
 	}
 
-	var res SimpleStringReply
+	var res *SimpleStringReply
 	for {
-		err = sub.Next(&res)
+		err = sub.Next(res)
 		if err != nil {
 			break
 		}
@@ -595,7 +595,7 @@ func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string) (re
 
 func (c *SvcSubjectParamsClient) MtStreamedReplyWithSubjectParams(
 	ctx context.Context, mp1 string, mp2 string,
-	cb func(context.Context, SimpleStringReply),
+	cb func(context.Context, *SimpleStringReply),
 ) error {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtstreamedreplywithsubjectparams" + "." + mp1 + "." + mp2
 
@@ -604,9 +604,9 @@ func (c *SvcSubjectParamsClient) MtStreamedReplyWithSubjectParams(
 		return err
 	}
 
-	var res SimpleStringReply
+	var res *SimpleStringReply
 	for {
-		err = sub.Next(&res)
+		err = sub.Next(res)
 		if err != nil {
 			break
 		}

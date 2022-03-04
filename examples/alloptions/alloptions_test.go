@@ -274,7 +274,7 @@ func TestAll(t *testing.T) {
 			err := c1.MtStreamedReply(
 				context.Background(),
 				StringArg{Arg1: "arg"},
-				func(ctx context.Context, rep SimpleStringReply) {
+				func(ctx context.Context, rep *SimpleStringReply) {
 					fmt.Println("received", rep)
 				})
 			if err == nil {
@@ -394,7 +394,7 @@ func commonTests(
 				log.SetOutput(TestingLogWriter{t})
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
-				err := c1.MtVoidReqStreamedReply(ctx, func(context.Context, SimpleStringReply) {})
+				err := c1.MtVoidReqStreamedReply(ctx, func(context.Context, *SimpleStringReply) {})
 				if err != nil {
 					fmt.Print(err)
 					t.Error(err)

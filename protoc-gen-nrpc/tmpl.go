@@ -476,7 +476,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	{{- if ne .GetInputType ".nrpc.Void"}}
 	req {{GoType .GetInputType}},
 	{{- end}}
-	cb func (context.Context, {{GoType .GetOutputType}}),
+	cb func(context.Context, *{{GoType .GetOutputType}}),
 ) error {
 {{- if Prometheus}}
 	start := time.Now()
@@ -505,9 +505,9 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 		return err
 	}
 
-	var res {{GoType .GetOutputType}}
+	var res *{{GoType .GetOutputType}}
 	for {
-		err = sub.Next(&res)
+		err = sub.Next(res)
 		if err != nil {
 			break
 		}
