@@ -373,7 +373,7 @@ func TestMarshalUnmarshalResponse(t *testing.T) {
 // MSG Greeter.SayHello-json 1 _INBOX.test 16\r\n{"foobar":"hello"}\r\n
 
 func compareStringSlices(t *testing.T, expected, actual []string) {
-	if len(expected) != len(expected) {
+	if len(expected) != len(actual) {
 		t.Errorf("String slices are different. Expected [%s], got [%s]",
 			strings.Join(expected, ","), strings.Join(actual, ","))
 		return
