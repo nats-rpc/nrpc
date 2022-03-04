@@ -35,8 +35,7 @@ func (s *BasicServerImpl) MtSimpleReply(ctx context.Context, args *StringArg) (r
 	if instance := nrpc.GetRequest(ctx).PackageParam("instance"); instance != "default" {
 		s.t.Errorf("Got an invalid package param instance: '%s'", instance)
 	}
-	resp.Reply = args.Arg1
-	return
+	return &SimpleStringReply{Reply: args.Arg1}, nil
 }
 
 func (s *BasicServerImpl) MtVoidReply(ctx context.Context, args *StringArg) (err error) {
@@ -88,8 +87,7 @@ func (s BasicServerImpl) MtWithSubjectParams(ctx context.Context, mp1, mp2 strin
 	if mp2 != "p2" {
 		err = fmt.Errorf("Expects method param mp2 = 'p2', got '%s'", mp2)
 	}
-	resp.Reply = "Hi"
-	return
+	return &SimpleStringReply{Reply: "Hi"}, nil
 }
 
 func (s BasicServerImpl) MtStreamedReplyWithSubjectParams(ctx context.Context, mp1 string, mp2 string, send func(rep SimpleStringReply)) error {

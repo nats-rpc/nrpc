@@ -243,6 +243,7 @@ func (c *SvcCustomSubjectClient) MtSimpleReply(req *StringArg) (resp *SimpleStri
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mt_simple_reply"
 
 	// call
+	resp = new(SimpleStringReply)
 	err = nrpc.Call(req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
@@ -256,7 +257,8 @@ func (c *SvcCustomSubjectClient) MtVoidReply(req *StringArg) (err error) {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + "mtvoidreply"
 
 	// call
-	var resp *github_com_T_J_L_nrpc.Void
+	resp := new(github_com_T_J_L_nrpc.Void)
+
 	err = nrpc.Call(req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
@@ -585,6 +587,7 @@ func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string) (re
 
 	// call
 	req := new(github_com_T_J_L_nrpc.Void)
+	resp = new(SimpleStringReply)
 	err = nrpc.Call(req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
@@ -624,7 +627,8 @@ func (c *SvcSubjectParamsClient) MtNoReply() (err error) {
 
 	// call
 	req := new(github_com_T_J_L_nrpc.Void)
-	var resp *github_com_T_J_L_nrpc.NoReply
+	resp := new(github_com_T_J_L_nrpc.NoReply)
+
 	err = nrpc.Call(req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged

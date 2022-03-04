@@ -554,7 +554,9 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	req := new({{GoType .GetInputType}})
 	{{- end}}
 	{{- if eq .GetOutputType ".nrpc.Void" ".nrpc.NoReply"}}
-	var resp *{{GoType .GetOutputType}}
+	resp := new({{GoType .GetOutputType}})
+	{{else}}
+	resp = new({{GoType .GetOutputType}})
 	{{- end}}
 	err = nrpc.Call(req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
