@@ -21,6 +21,6 @@ func TestAllOptionsExample(t *testing.T) {
 		"-o", "./examples/alloptions/alloptions",
 		"./examples/alloptions")
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatal("Buid failed", err, string(out))
+		t.Fatal("Build failed", err, string(out))
 	}
 }

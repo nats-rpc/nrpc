@@ -16,26 +16,24 @@ import (
 // GreeterServer is the interface that providers of the service
 // Greeter should implement.
 type GreeterServer interface {
-	SayHello(ctx context.Context, req HelloRequest) (resp HelloReply, err error)
+	SayHello(ctx context.Context, req *HelloRequest) (resp *HelloReply, err error)
 }
 
 // GreeterHandler provides a NATS subscription handler that can serve a
 // subscription using a given GreeterServer implementation.
 type GreeterHandler struct {
-	ctx     context.Context
-	workers *nrpc.WorkerPool
-	nc      nrpc.NatsConn
-	server  GreeterServer
-
+	ctx       context.Context
+	workers   *nrpc.WorkerPool
+	nc        nrpc.NatsConn
+	server    GreeterServer
 	encodings []string
 }
 
 func NewGreeterHandler(ctx context.Context, nc nrpc.NatsConn, s GreeterServer) *GreeterHandler {
 	return &GreeterHandler{
-		ctx:    ctx,
-		nc:     nc,
-		server: s,
-
+		ctx:       ctx,
+		nc:        nc,
+		server:    s,
 		encodings: []string{"protobuf"},
 	}
 }
@@ -85,8 +83,8 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 			log.Printf("SayHelloHanlder: SayHello subject parsing failed: %v", err)
 			break
 		}
-		var req HelloRequest
-		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
+		var req *HelloRequest
+		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
 				Type:    nrpc.Error_CLIENT,
@@ -98,7 +96,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 				if err != nil {
 					return nil, err
 				}
-				return &innerResp, err
+				return innerResp, err
 			}
 		}
 	default:
@@ -124,7 +122,6 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 		if err := request.SendReply(nil, immediateError); err != nil {
 			log.Printf("GreeterHandler: Greeter handler failed to publish the response: %s", err)
 		}
-	} else {
 	}
 }
 
@@ -144,12 +141,12 @@ func NewGreeterClient(nc nrpc.NatsConn) *GreeterClient {
 	}
 }
 
-func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
+func (c *GreeterClient) SayHello(req *HelloRequest) (resp *HelloReply, err error) {
 
 	subject := c.Subject + "." + "SayHello"
 
 	// call
-	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
+	err = nrpc.Call(req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
 	}

@@ -31,9 +31,7 @@ type BasicServerImpl struct {
 	handler2 *SvcSubjectParamsHandler
 }
 
-func (s BasicServerImpl) MtSimpleReply(
-	ctx context.Context, args StringArg,
-) (resp SimpleStringReply, err error) {
+func (s *BasicServerImpl) MtSimpleReply(ctx context.Context, args *StringArg) (resp *SimpleStringReply, err error) {
 	if instance := nrpc.GetRequest(ctx).PackageParam("instance"); instance != "default" {
 		s.t.Errorf("Got an invalid package param instance: '%s'", instance)
 	}
@@ -41,18 +39,14 @@ func (s BasicServerImpl) MtSimpleReply(
 	return
 }
 
-func (s BasicServerImpl) MtVoidReply(
-	ctx context.Context, args StringArg,
-) (err error) {
+func (s *BasicServerImpl) MtVoidReply(ctx context.Context, args *StringArg) (err error) {
 	if args.GetArg1() == "please fail" {
 		return errors.New("Error")
 	}
 	return nil
 }
 
-func (s BasicServerImpl) MtStreamedReply(
-	ctx context.Context, req StringArg, send func(rep SimpleStringReply),
-) error {
+func (s *BasicServerImpl) MtStreamedReply(ctx context.Context, req *StringArg, send func(rep SimpleStringReply)) error {
 	if req.GetArg1() == "please fail" {
 		panic("Failing")
 	}
@@ -75,9 +69,7 @@ func (s BasicServerImpl) MtStreamedReply(
 	return nil
 }
 
-func (s BasicServerImpl) MtVoidReqStreamedReply(
-	ctx context.Context, send func(rep SimpleStringReply),
-) error {
+func (s BasicServerImpl) MtVoidReqStreamedReply(ctx context.Context, send func(rep SimpleStringReply)) error {
 	time.Sleep(2 * time.Second)
 	send(SimpleStringReply{Reply: "hi"})
 	return nil
@@ -89,11 +81,7 @@ func (s BasicServerImpl) MtNoReply(ctx context.Context) {
 	s.handler2.MtNoRequestWParamsPublish("default", "me", "mtvalue", SimpleStringReply{Reply: "Hi there"})
 }
 
-func (s BasicServerImpl) MtWithSubjectParams(
-	ctx context.Context, mp1 string, mp2 string,
-) (
-	resp SimpleStringReply, err error,
-) {
+func (s BasicServerImpl) MtWithSubjectParams(ctx context.Context, mp1, mp2 string) (resp *SimpleStringReply, err error) {
 	if mp1 != "p1" {
 		err = fmt.Errorf("Expects method param mp1 = 'p1', got '%s'", mp1)
 	}
@@ -104,9 +92,7 @@ func (s BasicServerImpl) MtWithSubjectParams(
 	return
 }
 
-func (s BasicServerImpl) MtStreamedReplyWithSubjectParams(
-	ctx context.Context, mp1 string, mp2 string, send func(rep SimpleStringReply),
-) error {
+func (s BasicServerImpl) MtStreamedReplyWithSubjectParams(ctx context.Context, mp1 string, mp2 string, send func(rep SimpleStringReply)) error {
 	send(SimpleStringReply{Reply: mp1})
 	send(SimpleStringReply{Reply: mp2})
 	return nil
@@ -125,7 +111,7 @@ func TestAll(t *testing.T) {
 
 	t.Run("MultiProtocolPublish", func(t *testing.T) {
 		log.SetOutput(TestingLogWriter{t})
-		handler := NewSvcCustomSubjectHandler(context.Background(), c, BasicServerImpl{t, nil, nil})
+		handler := NewSvcCustomSubjectHandler(context.Background(), c, &BasicServerImpl{t, nil, nil})
 		handler.SetEncodings([]string{"protobuf", "json"})
 
 		c1 := NewSvcCustomSubjectClient(c, "default")
@@ -161,7 +147,7 @@ func TestAll(t *testing.T) {
 
 	t.Run("NoConcurrency", func(t *testing.T) {
 		log.SetOutput(TestingLogWriter{t})
-		handler1 := NewSvcCustomSubjectHandler(context.Background(), c, BasicServerImpl{t, nil, nil})
+		handler1 := NewSvcCustomSubjectHandler(context.Background(), c, &BasicServerImpl{t, nil, nil})
 		impl := BasicServerImpl{t, handler1, nil}
 		handler2 := NewSvcSubjectParamsHandler(context.Background(), c, &impl)
 		impl.handler2 = handler2
@@ -182,7 +168,7 @@ func TestAll(t *testing.T) {
 		log.SetOutput(TestingLogWriter{t})
 		pool := nrpc.NewWorkerPool(context.Background(), 2, 5, 4*time.Second)
 
-		handler1 := NewSvcCustomSubjectConcurrentHandler(pool, c, BasicServerImpl{t, nil, nil})
+		handler1 := NewSvcCustomSubjectConcurrentHandler(pool, c, &BasicServerImpl{t, nil, nil})
 		impl := BasicServerImpl{t, handler1, nil}
 		handler2 := NewSvcSubjectParamsConcurrentHandler(pool, c, &impl)
 		impl.handler2 = handler2
@@ -231,7 +217,7 @@ func TestAll(t *testing.T) {
 					err := c1.MtStreamedReply(
 						context.Background(),
 						StringArg{Arg1: "arg"},
-						func(ctx context.Context, rep SimpleStringReply) {
+						func(ctx context.Context, rep *SimpleStringReply) {
 							fmt.Println("received", rep)
 							resChan <- rep.GetReply()
 						})
@@ -267,7 +253,7 @@ func TestAll(t *testing.T) {
 					err := c1.MtStreamedReply(
 						context.Background(),
 						StringArg{Arg1: "arg"},
-						func(ctx context.Context, rep SimpleStringReply) {
+						func(ctx context.Context, rep *SimpleStringReply) {
 							fmt.Println("received", rep)
 							resChan <- rep.GetReply()
 						})
@@ -335,7 +321,7 @@ func commonTests(
 		c1.Encoding = encoding
 		c2.Encoding = encoding
 
-		r, err := c1.MtSimpleReply(StringArg{Arg1: "hi"})
+		r, err := c1.MtSimpleReply(&StringArg{Arg1: "hi"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -343,11 +329,11 @@ func commonTests(
 			t.Error("Invalid reply:", r.GetReply())
 		}
 
-		if err := c1.MtVoidReply(StringArg{Arg1: "hi"}); err != nil {
+		if err := c1.MtVoidReply(&StringArg{Arg1: "hi"}); err != nil {
 			t.Error("Unexpected error:", err)
 		}
 
-		err = c1.MtVoidReply(StringArg{Arg1: "please fail"})
+		err = c1.MtVoidReply(&StringArg{Arg1: "please fail"})
 		if err == nil {
 			t.Error("Expected an error")
 		}
@@ -360,7 +346,7 @@ func commonTests(
 				err := c1.MtStreamedReply(
 					context.Background(),
 					StringArg{Arg1: "arg"},
-					func(ctx context.Context, rep SimpleStringReply) {
+					func(ctx context.Context, rep *SimpleStringReply) {
 						fmt.Println("received", rep)
 						resList = append(resList, rep.GetReply())
 					})
@@ -382,7 +368,7 @@ func commonTests(
 				log.SetOutput(TestingLogWriter{t})
 				err := c1.MtStreamedReply(context.Background(),
 					StringArg{Arg1: "please fail"},
-					func(ctx context.Context, rep SimpleStringReply) {
+					func(ctx context.Context, rep *SimpleStringReply) {
 						t.Fatal("Should not receive anything")
 					})
 				if err == nil {
@@ -396,7 +382,7 @@ func commonTests(
 				defer cancel()
 				err := c1.MtStreamedReply(ctx,
 					StringArg{Arg1: "very long call"},
-					func(context.Context, SimpleStringReply) {
+					func(context.Context, *SimpleStringReply) {
 						t.Fatal("Should not receive anything")
 					})
 				if err != nrpc.ErrCanceled {
@@ -445,7 +431,7 @@ func commonTests(
 			err := c2.MtStreamedReplyWithSubjectParams(
 				context.Background(),
 				"arg1", "arg2",
-				func(ctx context.Context, rep SimpleStringReply) {
+				func(ctx context.Context, rep *SimpleStringReply) {
 					resList = append(resList, rep.GetReply())
 				})
 			if err != nil {

@@ -39,7 +39,7 @@ type {{.GetName}}Server interface {
 		, {{ . }} string
 		{{- end -}}
 		{{- if ne .GetInputType ".nrpc.Void" -}}
-		, req {{GoType .GetInputType}}
+		, req *{{GoType .GetInputType}}
 		{{- end -}}
 		{{- if HasStreamedReply . -}}
 		, pushRep func({{GoType .GetOutputType}})
@@ -47,7 +47,7 @@ type {{.GetName}}Server interface {
 	)
 		{{- if ne $resultType ".nrpc.NoReply" }} (
 		{{- if and (ne $resultType ".nrpc.Void") (not (HasStreamedReply .)) -}}
-		resp {{GoType $resultType}}, {{end -}}
+		resp *{{GoType $resultType}}, {{end -}}
 		err error)
 		{{- end -}}
 	{{- end}}
@@ -112,7 +112,6 @@ type {{.GetName}}Handler struct {
 	workers *nrpc.WorkerPool
 	nc      nrpc.NatsConn
 	server  {{.GetName}}Server
-
 	encodings []string
 }
 
@@ -121,7 +120,6 @@ func New{{.GetName}}Handler(ctx context.Context, nc nrpc.NatsConn, s {{.GetName}
 		ctx:    ctx,
 		nc:     nc,
 		server: s,
-
 		encodings: []string{"protobuf"},
 	}
 }
@@ -235,8 +233,8 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 			log.Printf("{{.GetName}}Hanlder: {{.GetName}} subject parsing failed: %v", err)
 			break
 		}
-		var req {{GoType .GetInputType}}
-		if err := nrpc.Unmarshal(request.Encoding, msg.Data, &req); err != nil {
+		var req *{{GoType .GetInputType}}
+		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("{{.GetName}}Handler: {{.GetName}} request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
 				Type: nrpc.Error_CLIENT,
@@ -249,7 +247,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		} else {
 			{{- if HasStreamedReply .}}
 			request.EnableStreamedReply()
-			request.Handler = func(ctx context.Context)(proto.Message, error){
+			request.Handler = func(ctx context.Context) (proto.Message, error) {
 				err := h.server.{{.GetName}}(ctx
 				{{- range $i, $p := GetMethodSubjectParams . -}}
 				, mtParams[{{ $i }}]
@@ -263,12 +261,12 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 				return nil, err
 			}
 			{{- else }}
-			request.Handler = func(ctx context.Context)(proto.Message, error){
+			request.Handler = func(ctx context.Context) (proto.Message, error) {
 				{{- if eq .GetOutputType ".nrpc.NoReply" -}}
-				var innerResp nrpc.NoReply
+				var innerResp *nrpc.NoReply
 				{{else}}
 				{{if eq .GetOutputType ".nrpc.Void" -}}
-				var innerResp nrpc.Void
+				var innerResp *nrpc.Void
 				{{else}}innerResp, {{end -}}
 				err := {{end -}}
 				h.server.{{.GetName}}(ctx
@@ -282,7 +280,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 				if err != nil {
 					return nil, err
 				}
-				return &innerResp, err
+				return innerResp, err
 			}
 			{{- end }}
 		}
@@ -343,7 +341,6 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 		serverHETFor{{$serviceName}}.WithLabelValues(request.MethodName).Observe(
 			request.Elapsed().Seconds())
 {{- end}}
-	} else {
 	}
 }
 {{- end}}
@@ -413,7 +410,6 @@ func (c *{{$serviceName}}Client) {{.GetName}}Subject(
 
 type {{$serviceName}}{{.GetName}}Subscription struct {
 	*nats.Subscription
-	
 	encoding string
 }
 
@@ -442,8 +438,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}SubscribeSync(
 
 func (c *{{$serviceName}}Client) {{.GetName}}Subscribe(
 	{{range GetMethodSubjectParams .}}mt{{.}} string,{{end}}
-	handler func ({{GoType .GetOutputType}}),
-) (sub *nats.Subscription, err error) {
+	handler func ({{GoType .GetOutputType}})) (sub *nats.Subscription, err error) {
 	subject := c.{{.GetName}}Subject(
 		{{range GetMethodSubjectParams .}}mt{{.}},{{end}}
 	)
@@ -536,10 +531,10 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 	{{- range GetMethodSubjectParams . -}}
 	{{ . }} string, {{ end -}}
 	{{- if ne .GetInputType ".nrpc.Void" -}}
-	req {{GoType .GetInputType}}
+	req *{{GoType .GetInputType}}
 	{{- end -}}) (
 		{{- if not (eq $resultType ".nrpc.Void" ".nrpc.NoReply") -}}
-		resp {{GoType $resultType}}, {{end -}}
+		resp *{{GoType $resultType}}, {{end -}}
 		err error) {
 {{- if Prometheus}}
 	start := time.Now()
@@ -556,12 +551,12 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 
 	// call
 	{{- if eq .GetInputType ".nrpc.Void"}}
-	var req {{GoType .GetInputType}}
+	var req *{{GoType .GetInputType}}
 	{{- end}}
 	{{- if eq .GetOutputType ".nrpc.Void" ".nrpc.NoReply"}}
-	var resp {{GoType .GetOutputType}}
+	var resp *{{GoType .GetOutputType}}
 	{{- end}}
-	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
+	err = nrpc.Call(req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 {{- if Prometheus}}
 		clientCallsFor{{$serviceName}}.WithLabelValues(
