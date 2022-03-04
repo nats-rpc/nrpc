@@ -41,7 +41,7 @@ func TestBasic(t *testing.T) {
 	cli := helloworld.NewGreeterClient(nc)
 
 	// Contact the server and print out its response.
-	resp, err := cli.SayHello(helloworld.HelloRequest{Name: "world"})
+	resp, err := cli.SayHello(&helloworld.HelloRequest{Name: "world"})
 	if err != nil {
 		t.Fatal(err)
 	}

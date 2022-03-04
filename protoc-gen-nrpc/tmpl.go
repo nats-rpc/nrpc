@@ -233,7 +233,7 @@ func (h *{{.GetName}}Handler) Handler(msg *nats.Msg) {
 			log.Printf("{{.GetName}}Hanlder: {{.GetName}} subject parsing failed: %v", err)
 			break
 		}
-		var req *{{GoType .GetInputType}}
+		req := new({{GoType .GetInputType}})
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("{{.GetName}}Handler: {{.GetName}} request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -505,7 +505,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 		return err
 	}
 
-	var res *{{GoType .GetOutputType}}
+	res := new({{GoType .GetOutputType}})
 	for {
 		err = sub.Next(res)
 		if err != nil {
@@ -551,7 +551,7 @@ func (c *{{$serviceName}}Client) {{.GetName}}(
 
 	// call
 	{{- if eq .GetInputType ".nrpc.Void"}}
-	var req *{{GoType .GetInputType}}
+	req := new({{GoType .GetInputType}})
 	{{- end}}
 	{{- if eq .GetOutputType ".nrpc.Void" ".nrpc.NoReply"}}
 	var resp *{{GoType .GetOutputType}}

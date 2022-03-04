@@ -106,7 +106,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtSimpleReplyHanlder: MtSimpleReply subject parsing failed: %v", err)
 			break
 		}
-		var req *StringArg
+		req := new(StringArg)
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("MtSimpleReplyHandler: MtSimpleReply request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -128,7 +128,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtVoidReplyHanlder: MtVoidReply subject parsing failed: %v", err)
 			break
 		}
-		var req *StringArg
+		req := new(StringArg)
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("MtVoidReplyHandler: MtVoidReply request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -154,7 +154,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtStreamedReplyHanlder: MtStreamedReply subject parsing failed: %v", err)
 			break
 		}
-		var req *StringArg
+		req := new(StringArg)
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("MtStreamedReplyHandler: MtStreamedReply request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -176,7 +176,7 @@ func (h *SvcCustomSubjectHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtVoidReqStreamedReplyHanlder: MtVoidReqStreamedReply subject parsing failed: %v", err)
 			break
 		}
-		var req *github_com_T_J_L_nrpc.Void
+		req := new(github_com_T_J_L_nrpc.Void)
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("MtVoidReqStreamedReplyHandler: MtVoidReqStreamedReply request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -333,7 +333,7 @@ func (c *SvcCustomSubjectClient) MtStreamedReply(
 		return err
 	}
 
-	var res *SimpleStringReply
+	res := new(SimpleStringReply)
 	for {
 		err = sub.Next(res)
 		if err != nil {
@@ -358,7 +358,7 @@ func (c *SvcCustomSubjectClient) MtVoidReqStreamedReply(
 		return err
 	}
 
-	var res *SimpleStringReply
+	res := new(SimpleStringReply)
 	for {
 		err = sub.Next(res)
 		if err != nil {
@@ -465,7 +465,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtWithSubjectParamsHanlder: MtWithSubjectParams subject parsing failed: %v", err)
 			break
 		}
-		var req *github_com_T_J_L_nrpc.Void
+		req := new(github_com_T_J_L_nrpc.Void)
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("MtWithSubjectParamsHandler: MtWithSubjectParams request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -488,7 +488,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtStreamedReplyWithSubjectParamsHanlder: MtStreamedReplyWithSubjectParams subject parsing failed: %v", err)
 			break
 		}
-		var req *github_com_T_J_L_nrpc.Void
+		req := new(github_com_T_J_L_nrpc.Void)
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("MtStreamedReplyWithSubjectParamsHandler: MtStreamedReplyWithSubjectParams request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -511,7 +511,7 @@ func (h *SvcSubjectParamsHandler) Handler(msg *nats.Msg) {
 			log.Printf("MtNoReplyHanlder: MtNoReply subject parsing failed: %v", err)
 			break
 		}
-		var req *github_com_T_J_L_nrpc.Void
+		req := new(github_com_T_J_L_nrpc.Void)
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("MtNoReplyHandler: MtNoReply request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
@@ -584,7 +584,7 @@ func (c *SvcSubjectParamsClient) MtWithSubjectParams(mp1 string, mp2 string) (re
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtwithsubjectparams" + "." + mp1 + "." + mp2
 
 	// call
-	var req *github_com_T_J_L_nrpc.Void
+	req := new(github_com_T_J_L_nrpc.Void)
 	err = nrpc.Call(req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {
 		return // already logged
@@ -604,7 +604,7 @@ func (c *SvcSubjectParamsClient) MtStreamedReplyWithSubjectParams(
 		return err
 	}
 
-	var res *SimpleStringReply
+	res := new(SimpleStringReply)
 	for {
 		err = sub.Next(res)
 		if err != nil {
@@ -623,7 +623,7 @@ func (c *SvcSubjectParamsClient) MtNoReply() (err error) {
 	subject := c.PkgSubject + "." + c.PkgParaminstance + "." + c.Subject + "." + c.SvcParamclientid + "." + "mtnoreply"
 
 	// call
-	var req *github_com_T_J_L_nrpc.Void
+	req := new(github_com_T_J_L_nrpc.Void)
 	var resp *github_com_T_J_L_nrpc.NoReply
 	err = nrpc.Call(req, resp, c.nc, subject, c.Encoding, c.Timeout)
 	if err != nil {

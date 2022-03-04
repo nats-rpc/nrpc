@@ -132,7 +132,7 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 			log.Printf("SayHelloHanlder: SayHello subject parsing failed: %v", err)
 			break
 		}
-		var req *HelloRequest
+		req := new(HelloRequest)
 		if err := nrpc.Unmarshal(request.Encoding, msg.Data, req); err != nil {
 			log.Printf("SayHelloHandler: SayHello request unmarshal failed: %v", err)
 			immediateError = &nrpc.Error{
