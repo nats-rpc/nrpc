@@ -730,12 +730,7 @@ type WorkerPool struct {
 }
 
 // NewWorkerPool creates a pool of workers
-func NewWorkerPool(
-	ctx context.Context,
-	size uint,
-	maxPending uint,
-	maxPendingDuration time.Duration,
-) *WorkerPool {
+func NewWorkerPool(ctx context.Context, size, maxPending uint, maxPendingDuration time.Duration) *WorkerPool {
 	nCtx, cancel := context.WithCancel(ctx)
 	pool := WorkerPool{
 		Context:            nCtx,
