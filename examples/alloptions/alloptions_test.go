@@ -87,7 +87,7 @@ func (s BasicServerImpl) MtWithSubjectParams(ctx context.Context, mp1, mp2 strin
 	if mp2 != "p2" {
 		err = fmt.Errorf("Expects method param mp2 = 'p2', got '%s'", mp2)
 	}
-	return &SimpleStringReply{Reply: "Hi"}, nil
+	return &SimpleStringReply{Reply: "Hi"}, err
 }
 
 func (s BasicServerImpl) MtStreamedReplyWithSubjectParams(ctx context.Context, mp1 string, mp2 string, send func(rep SimpleStringReply)) error {
