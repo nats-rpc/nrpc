@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -395,7 +395,7 @@ var currentFile *descriptor.FileDescriptorProto
 func main() {
 
 	log.SetPrefix("protoc-gen-nrpc: ")
-	data, err := ioutil.ReadAll(os.Stdin)
+	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		log.Fatalf("error: reading input: %v", err)
 	}

@@ -1,11 +1,8 @@
 package nrpc
 
 import (
-	//"bytes"
-	//"os"
 	"os/exec"
 	"testing"
-	//"time"
 )
 
 func TestAllOptionsExample(t *testing.T) {

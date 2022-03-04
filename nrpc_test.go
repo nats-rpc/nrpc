@@ -46,7 +46,7 @@ func TestBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 	if dm.Foobar != "world" {
-		t.Fatal("wrong response: ", string(dm.Foobar))
+		t.Fatal("wrong response: ", dm.Foobar)
 	}
 }
 
@@ -89,7 +89,7 @@ func TestDecode(t *testing.T) {
 			t.Fatal(err)
 		}
 		if dm.Foobar != "world" {
-			t.Fatal("wrong response: ", string(dm.Foobar))
+			t.Fatal("wrong response: ", dm.Foobar)
 		}
 	}
 }
