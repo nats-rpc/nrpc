@@ -20,6 +20,8 @@ extend google.protobuf.FileOptions {
     SubjectRule serviceSubjectRule = 50002;
     // Default rule to build a method subject from its name
     SubjectRule methodSubjectRule = 50003;
+    // A custom prefix to use with generated types
+    string typesPrefix = 50004;
 }
 
 extend google.protobuf.ServiceOptions {
@@ -30,7 +32,7 @@ extend google.protobuf.ServiceOptions {
 }
 
 extend google.protobuf.MethodOptions {
-    // A custom subject to use instead of (methor name + methodSubjectRule)
+    // A custom subject to use instead of (method name + methodSubjectRule)
     string methodSubject = 52000;
     // Parameters included in the subject at the method level
     repeated string methodSubjectParams = 52001;

@@ -2,10 +2,11 @@ syntax = "proto3";
 
 package main;
 
-option go_package = ".;main";
+option go_package = "./;main";
 
 import "nrpc/nrpc.proto";
 
+option (nrpc.typesPrefix) = "";
 option (nrpc.packageSubject) = "root";
 option (nrpc.packageSubjectParams) = "instance";
 
