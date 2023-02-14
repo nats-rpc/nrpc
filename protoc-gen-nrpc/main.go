@@ -293,6 +293,15 @@ var funcMap = template.FuncMap{
 		}
 		return ""
 	},
+	"GetTypesPrefix": func(fd *descriptor.FileDescriptorProto) string {
+		if options := fd.GetOptions(); options != nil {
+			e := proto.GetExtension(options, nrpc.E_TypesPrefix)
+			if value, ok := e.(string); ok {
+				return value
+			}
+		}
+		return ""
+	},
 	"GetPkgSubject": pkgSubject,
 	"GetPkgSubjectParams": func(fd *descriptor.FileDescriptorProto) []string {
 		if opts := fd.GetOptions(); opts != nil {
