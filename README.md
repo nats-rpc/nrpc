@@ -139,7 +139,7 @@ The following wiki pages describe nRPC features in more detail:
 
 ## Installation
 
-nRPC needs Go 1.7 or higher. $GOPATH/bin needs to be in $PATH for the protoc
+nRPC needs Go 1.11 or higher. $GOPATH/bin needs to be in $PATH for the protoc
 invocation to work. To generate code, you need the protobuf compiler (which
 you can install from [here](https://github.com/google/protobuf/releases))
 and the nRPC protoc plugin.
@@ -147,13 +147,13 @@ and the nRPC protoc plugin.
 To install the nRPC protoc plugin:
 
 ```
-$ go get github.com/nats-rpc/nrpc/protoc-gen-nrpc
+$ go install github.com/nats-rpc/nrpc/protoc-gen-nrpc@latest
 ```
 
 To build and run the example greeter_server:
 
 ```
-$ go get github.com/nats-rpc/nrpc/examples/helloworld/greeter_server
+$ go install github.com/nats-rpc/nrpc/examples/helloworld/greeter_server@latest
 $ greeter_server
 server is running, ^C quits.
 ```
@@ -161,7 +161,7 @@ server is running, ^C quits.
 To build and run the example greeter_client:
 
 ```
-$ go get github.com/nats-rpc/nrpc/examples/helloworld/greeter_client
+$ go install github.com/nats-rpc/nrpc/examples/helloworld/greeter_client@latest
 $ greeter_client
 Greeting: Hello world
 $
