@@ -14,7 +14,7 @@ import (
 // GreeterServer is the interface that providers of the service
 // Greeter should implement.
 type GreeterServer interface {
-	SayHello(ctx context.Context, req HelloRequest) (resp HelloReply, err error)
+	SayHello(ctx context.Context, req *HelloRequest) (*HelloReply, error)
 }
 
 // GreeterHandler provides a NATS subscription handler that can serve a
@@ -92,11 +92,11 @@ func (h *GreeterHandler) Handler(msg *nats.Msg) {
 			}
 		} else {
 			request.Handler = func(ctx context.Context)(proto.Message, error){
-				innerResp, err := h.server.SayHello(ctx, req)
+				innerResp, err := h.server.SayHello(ctx, &req)
 				if err != nil {
 					return nil, err
 				}
-				return &innerResp, err
+				return innerResp, err
 			}
 		}
 	default:
@@ -142,17 +142,17 @@ func NewGreeterClient(nc nrpc.NatsConn) *GreeterClient {
 	}
 }
 
-func (c *GreeterClient) SayHello(req HelloRequest) (resp HelloReply, err error) {
+func (c *GreeterClient) SayHello(req *HelloRequest) (*HelloReply, error) {
 
 	subject := c.Subject + "." + "SayHello"
 
 	// call
-	err = nrpc.Call(&req, &resp, c.nc, subject, c.Encoding, c.Timeout)
-	if err != nil {
-		return // already logged
+	var resp = HelloReply{}
+	if err := nrpc.Call(req, &resp, c.nc, subject, c.Encoding, c.Timeout); err != nil {
+		return nil, err
 	}
 
-	return
+	return &resp, nil
 }
 
 type Client struct {
