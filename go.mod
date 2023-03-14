@@ -8,5 +8,5 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/stretchr/testify v1.8.1
 	golang.org/x/crypto v0.7.0 // indirect
-	google.golang.org/protobuf v1.29.0
+	google.golang.org/protobuf v1.29.1
 )
