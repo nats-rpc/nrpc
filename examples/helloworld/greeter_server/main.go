@@ -20,9 +20,8 @@ type server struct{}
 
 // SayHello is an implementation of the SayHello method from the definition of
 // the Greeter service.
-func (s *server) SayHello(ctx context.Context, req helloworld.HelloRequest) (resp helloworld.HelloReply, err error) {
-	resp.Message = "Hello " + req.Name
-	return
+func (s *server) SayHello(ctx context.Context, req *helloworld.HelloRequest) (resp *helloworld.HelloReply, err error) {
+	return &helloworld.HelloReply{Message: "Hello " + req.Name}, nil
 }
 
 func main() {
