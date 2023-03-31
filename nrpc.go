@@ -17,6 +17,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	statusHeader      = "Status"
+	noResponderStatus = "503"
+)
+
 // ContextKey type for storing values into context.Context
 type ContextKey int
 
@@ -550,6 +555,11 @@ func (sub *StreamCallSubscription) loop(ssub *nats.Subscription) {
 
 			if len(msg.Data) == 1 && msg.Data[0] == 0 {
 				break
+			}
+			// Check for no responder status.
+			if len(msg.Data) == 0 && msg.Header.Get(statusHeader) == noResponderStatus {
+				sub.errCh <- nats.ErrNoResponders
+				return
 			}
 
 			sub.nextCh <- msg
