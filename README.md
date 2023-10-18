@@ -9,6 +9,9 @@ It can generate a Go client and server from the same .proto file that you'd
 use to generate gRPC clients and servers. The server is generated as a NATS
 [MsgHandler](https://godoc.org/github.com/nats-io/nats.go#MsgHandler).
 
+The [Specifications](https://github.com/nats-rpc/nrpc/wiki/Specifications) 
+describes how nRPC translates protobuf services and methods into NATS patterns.
+
 ## Why NATS?
 
 Doing RPC over NATS'
