@@ -11,5 +11,5 @@ require (
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/stretchr/testify v1.8.1
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.33.0
 )
